@@ -1,0 +1,137 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Account;
+use App\Models\LedgerEntry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class AccountTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @test */
+    public function it_can_create_an_account()
+    {
+        $response = $this->postJson('/api/accounts', [
+            'account_id' => 'TEST001',
+            'name'       => 'Test User',
+        ]);
+
+        $response->assertStatus(201)
+                 ->assertJsonPath('data.account_id', 'TEST001')
+                 ->assertJsonPath('data.name', 'Test User');
+
+        $this->assertDatabaseHas('accounts', ['account_id' => 'TEST001']);
+    }
+
+    /** @test */
+    public function it_rejects_duplicate_account_id()
+    {
+        Account::create(['account_id' => 'DUP001', 'name' => 'First']);
+
+        $response = $this->postJson('/api/accounts', [
+            'account_id' => 'DUP001',
+            'name'       => 'Second',
+        ]);
+
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors('account_id');
+    }
+
+    /** @test */
+    public function it_rejects_invalid_account_id_format()
+    {
+        $response = $this->postJson('/api/accounts', [
+            'account_id' => 'invalid account!@#',
+        ]);
+
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors('account_id');
+    }
+
+    /** @test */
+    public function it_returns_balance_as_zero_for_new_account()
+    {
+        Account::create(['account_id' => 'ZERO001', 'name' => 'Zero Balance']);
+
+        $response = $this->getJson('/api/accounts/ZERO001/balance');
+
+        $response->assertStatus(200)
+                 ->assertJsonPath('data.account_id', 'ZERO001')
+                 ->assertJsonPath('data.balance', '0.00');
+    }
+
+    /** @test */
+    public function it_returns_correct_balance_from_ledger()
+    {
+        Account::create(['account_id' => 'BAL001', 'name' => 'Balance Test']);
+        Account::create(['account_id' => 'BAL002', 'name' => 'Counterparty']);
+
+        // Credit 1000
+        LedgerEntry::create([
+            'transaction_id'          => 'TXN-BAL-1',
+            'account_id'              => 'BAL001',
+            'entry_type'              => 'credit',
+            'amount'                  => 1000.00,
+            'counterparty_account_id' => 'BAL002',
+        ]);
+
+        // Debit 250
+        LedgerEntry::create([
+            'transaction_id'          => 'TXN-BAL-2',
+            'account_id'              => 'BAL001',
+            'entry_type'              => 'debit',
+            'amount'                  => 250.00,
+            'counterparty_account_id' => 'BAL002',
+        ]);
+
+        $response = $this->getJson('/api/accounts/BAL001/balance');
+
+        $response->assertStatus(200)
+                 ->assertJsonPath('data.balance', '750.00');
+    }
+
+    /** @test */
+    public function it_returns_404_for_nonexistent_account_balance()
+    {
+        $response = $this->getJson('/api/accounts/GHOST999/balance');
+        $response->assertStatus(404);
+    }
+
+    /** @test */
+    public function it_returns_transaction_history()
+    {
+        Account::create(['account_id' => 'HIST001', 'name' => 'History Test']);
+        Account::create(['account_id' => 'HIST002', 'name' => 'Counterparty']);
+
+        LedgerEntry::create([
+            'transaction_id'          => 'TXN-H1',
+            'account_id'              => 'HIST001',
+            'entry_type'              => 'credit',
+            'amount'                  => 500.00,
+            'counterparty_account_id' => 'HIST002',
+            'description'             => 'Test credit',
+        ]);
+
+        $response = $this->getJson('/api/accounts/HIST001/transactions');
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(1, 'data')
+                 ->assertJsonPath('data.0.type', 'credit')
+                 ->assertJsonPath('data.0.amount', '500.00');
+    }
+
+    /** @test */
+    public function it_lists_all_accounts()
+    {
+        Account::create(['account_id' => 'LIST001', 'name' => 'First']);
+        Account::create(['account_id' => 'LIST002', 'name' => 'Second']);
+
+        $response = $this->getJson('/api/accounts');
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(2, 'data');
+    }
+}
