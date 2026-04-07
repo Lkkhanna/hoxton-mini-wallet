@@ -4,8 +4,6 @@
 !Makefile
 !README.md
 !AI_USAGE.md
-!backend/
-!frontend/
 frontend/node_modules/
 *.log
 .env
