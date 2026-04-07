@@ -1,4 +1,4 @@
-# 🏦 Mini Wallet & Ledger System
+# 🏦 Hoxton Mini Wallet
 
 A minimal full-stack financial system that simulates account management, money transfers, transaction tracking, and balance visibility — built with **Laravel 12**, **Vue 2**, and **MySQL 8**.
 
@@ -22,8 +22,8 @@ A minimal full-stack financial system that simulates account management, money t
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/hoxton-wallet-ledger.git
-cd hoxton-wallet-ledger
+git clone https://github.com/YOUR_USERNAME/hoxton-mini-wallet.git
+cd hoxton-mini-wallet
 
 # 2. Build and start all services
 docker-compose up --build

@@ -3,6 +3,8 @@
 !docker-compose.yml
 !Makefile
 !README.md
+!backend
+!frontend
 !AI_USAGE.md
 frontend/node_modules/
 *.log
