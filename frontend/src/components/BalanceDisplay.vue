@@ -1,28 +1,24 @@
 <template>
   <div class="card balance-card" id="balance-display">
     <div class="card-title">
-      <span>💰</span> Balance
+      Balance
     </div>
 
-    <!-- No account selected -->
     <div v-if="!accountId" class="balance-placeholder">
-      Select an account to view balance
+      Select an account to reveal its live ledger balance.
     </div>
 
-    <!-- Loading -->
     <div v-else-if="loading" class="loading-container">
       <span class="spinner"></span>
       <span>Loading balance...</span>
     </div>
 
-    <!-- Error -->
     <div v-else-if="error" class="error-message">
       {{ error }}
     </div>
 
-    <!-- Balance Display -->
     <div v-else class="balance-amount-container">
-      <div class="balance-label">Current Balance</div>
+      <div class="balance-label">Current balance</div>
       <div class="balance-amount" :class="balanceClass">
         <span class="currency">$</span>{{ formattedBalance }}
       </div>
@@ -62,58 +58,61 @@ export default {
 
 <style scoped>
 .balance-card {
-  background: linear-gradient(135deg, #1a1d2e 0%, #1e2235 100%);
+  background: linear-gradient(145deg, rgba(12, 37, 57, 0.98), rgba(12, 80, 88, 0.94));
+  color: #fdf8ef;
 }
 
 .balance-placeholder {
-  color: var(--color-text-muted);
-  font-size: 14px;
+  color: rgba(253, 248, 239, 0.68);
+  font-size: 0.94rem;
   text-align: center;
-  padding: 20px 0;
+  padding: 28px 0;
 }
 
 .balance-amount-container {
   text-align: center;
-  padding: 8px 0;
+  padding: 12px 0 4px;
 }
 
 .balance-label {
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  color: rgba(253, 248, 239, 0.7);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
+  letter-spacing: 0.16em;
+  margin-bottom: 12px;
 }
 
 .balance-amount {
-  font-size: 36px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-family: var(--font-family-display);
+  font-size: 3.4rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   transition: color 0.3s ease;
+  line-height: 1;
 }
 
 .balance-amount .currency {
-  font-size: 22px;
-  margin-right: 2px;
-  opacity: 0.7;
+  font-size: 1.8rem;
+  margin-right: 4px;
+  opacity: 0.72;
 }
 
 .balance-amount.positive {
-  color: var(--color-success);
+  color: #f7dfab;
 }
 
 .balance-amount.zero {
-  color: var(--color-text-secondary);
+  color: rgba(253, 248, 239, 0.82);
 }
 
 .balance-amount.negative {
-  color: var(--color-danger);
+  color: #f2b2aa;
 }
 
 .balance-account {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-top: 8px;
+  font-size: 0.86rem;
+  color: rgba(253, 248, 239, 0.72);
+  margin-top: 14px;
   font-family: monospace;
 }
 </style>

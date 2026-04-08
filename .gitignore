@@ -4,9 +4,15 @@
 !Makefile
 !README.md
 !backend
+!backend/**
 !frontend
+!frontend/**
 !AI_USAGE.md
 frontend/node_modules/
 *.log
 .env
+backend/.env
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 .DS_Store

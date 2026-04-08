@@ -16,28 +16,49 @@ class AccountTest extends TestCase
     {
         $response = $this->postJson('/api/accounts', [
             'account_id' => 'TEST001',
-            'name'       => 'Test User',
+            'name' => 'Test User',
         ]);
 
         $response->assertStatus(201)
-                 ->assertJsonPath('data.account_id', 'TEST001')
-                 ->assertJsonPath('data.name', 'Test User');
+            ->assertJsonPath('data.account_id', 'TEST001')
+            ->assertJsonPath('data.name', 'Test User')
+            ->assertJsonPath('data.balance', '0.00');
 
         $this->assertDatabaseHas('accounts', ['account_id' => 'TEST001']);
     }
 
     /** @test */
-    public function it_rejects_duplicate_account_id()
+    public function it_normalizes_account_creation_input()
+    {
+        $response = $this->postJson('/api/accounts', [
+            'account_id' => ' acc-001 ',
+            'name' => '  Test User  ',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.account_id', 'ACC-001')
+            ->assertJsonPath('data.name', 'Test User');
+
+        $this->assertDatabaseHas('accounts', [
+            'account_id' => 'ACC-001',
+            'name' => 'Test User',
+        ]);
+    }
+
+    /** @test */
+    public function it_returns_conflict_when_creating_a_duplicate_account_id()
     {
         Account::create(['account_id' => 'DUP001', 'name' => 'First']);
 
         $response = $this->postJson('/api/accounts', [
-            'account_id' => 'DUP001',
-            'name'       => 'Second',
+            'account_id' => 'dup001',
+            'name' => 'Second',
         ]);
 
-        $response->assertStatus(422)
-                 ->assertJsonValidationErrors('account_id');
+        $response->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('data.account_id', 'DUP001')
+            ->assertJsonPath('errors.account_id.0', "Account 'DUP001' already exists.");
     }
 
     /** @test */
@@ -48,7 +69,7 @@ class AccountTest extends TestCase
         ]);
 
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors('account_id');
+            ->assertJsonValidationErrors('account_id');
     }
 
     /** @test */
@@ -59,8 +80,8 @@ class AccountTest extends TestCase
         $response = $this->getJson('/api/accounts/ZERO001/balance');
 
         $response->assertStatus(200)
-                 ->assertJsonPath('data.account_id', 'ZERO001')
-                 ->assertJsonPath('data.balance', '0.00');
+            ->assertJsonPath('data.account_id', 'ZERO001')
+            ->assertJsonPath('data.balance', '0.00');
     }
 
     /** @test */
@@ -69,28 +90,26 @@ class AccountTest extends TestCase
         Account::create(['account_id' => 'BAL001', 'name' => 'Balance Test']);
         Account::create(['account_id' => 'BAL002', 'name' => 'Counterparty']);
 
-        // Credit 1000
         LedgerEntry::create([
-            'transaction_id'          => 'TXN-BAL-1',
-            'account_id'              => 'BAL001',
-            'entry_type'              => 'credit',
-            'amount'                  => 1000.00,
+            'transaction_id' => 'TXN-BAL-1',
+            'account_id' => 'BAL001',
+            'entry_type' => 'credit',
+            'amount' => 1000.00,
             'counterparty_account_id' => 'BAL002',
         ]);
 
-        // Debit 250
         LedgerEntry::create([
-            'transaction_id'          => 'TXN-BAL-2',
-            'account_id'              => 'BAL001',
-            'entry_type'              => 'debit',
-            'amount'                  => 250.00,
+            'transaction_id' => 'TXN-BAL-2',
+            'account_id' => 'BAL001',
+            'entry_type' => 'debit',
+            'amount' => 250.00,
             'counterparty_account_id' => 'BAL002',
         ]);
 
         $response = $this->getJson('/api/accounts/BAL001/balance');
 
         $response->assertStatus(200)
-                 ->assertJsonPath('data.balance', '750.00');
+            ->assertJsonPath('data.balance', '750.00');
     }
 
     /** @test */
@@ -107,20 +126,51 @@ class AccountTest extends TestCase
         Account::create(['account_id' => 'HIST002', 'name' => 'Counterparty']);
 
         LedgerEntry::create([
-            'transaction_id'          => 'TXN-H1',
-            'account_id'              => 'HIST001',
-            'entry_type'              => 'credit',
-            'amount'                  => 500.00,
+            'transaction_id' => 'TXN-H1',
+            'account_id' => 'HIST001',
+            'entry_type' => 'credit',
+            'amount' => 500.00,
             'counterparty_account_id' => 'HIST002',
-            'description'             => 'Test credit',
+            'description' => 'Test credit',
         ]);
 
         $response = $this->getJson('/api/accounts/HIST001/transactions');
 
         $response->assertStatus(200)
-                 ->assertJsonCount(1, 'data')
-                 ->assertJsonPath('data.0.type', 'credit')
-                 ->assertJsonPath('data.0.amount', '500.00');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.type', 'credit')
+            ->assertJsonPath('data.0.amount', '500.00')
+            ->assertJsonPath('meta.pagination.current_page', 1)
+            ->assertJsonPath('meta.pagination.total', 1);
+    }
+
+    /** @test */
+    public function it_paginates_transaction_history()
+    {
+        Account::create(['account_id' => 'PAGE001', 'name' => 'Paged History']);
+        Account::create(['account_id' => 'PAGE002', 'name' => 'Counterparty']);
+
+        foreach (range(1, 12) as $index) {
+            LedgerEntry::create([
+                'transaction_id' => 'TXN-PAGE-' . $index,
+                'account_id' => 'PAGE001',
+                'entry_type' => $index % 2 === 0 ? 'debit' : 'credit',
+                'amount' => 10 + $index,
+                'counterparty_account_id' => 'PAGE002',
+                'description' => 'Paged entry ' . $index,
+                'created_at' => now()->subMinutes($index),
+                'updated_at' => now()->subMinutes($index),
+            ]);
+        }
+
+        $response = $this->getJson('/api/accounts/PAGE001/transactions?page=2&per_page=5');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('meta.pagination.current_page', 2)
+            ->assertJsonPath('meta.pagination.last_page', 3)
+            ->assertJsonPath('meta.pagination.per_page', 5)
+            ->assertJsonPath('meta.pagination.total', 12);
     }
 
     /** @test */
@@ -132,6 +182,6 @@ class AccountTest extends TestCase
         $response = $this->getJson('/api/accounts');
 
         $response->assertStatus(200)
-                 ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data');
     }
 }

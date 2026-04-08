@@ -11,10 +11,10 @@ return new class extends Migration
         Schema::create('ledger_entries', function (Blueprint $table) {
             $table->id();
             $table->string('transaction_id', 100);
-            $table->string('account_id', 50);
+            $table->string('account_id', 10);
             $table->enum('entry_type', ['credit', 'debit']);
             $table->decimal('amount', 15, 2)->unsigned();
-            $table->string('counterparty_account_id', 50);
+            $table->string('counterparty_account_id', 10);
             $table->string('description', 255)->nullable();
             $table->timestamp('created_at')->useCurrent();
 

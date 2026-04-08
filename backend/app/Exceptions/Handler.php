@@ -40,6 +40,20 @@ class Handler extends ExceptionHandler
             ], 422);
         });
 
+        // Handle account creation conflicts
+        $this->renderable(function (AccountAlreadyExistsException $e, $request) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => [
+                    'account_id' => [$e->getMessage()],
+                ],
+                'data' => [
+                    'account_id' => $e->getAccountId(),
+                ],
+            ], 409);
+        });
+
         // Handle duplicate transactions (idempotency)
         $this->renderable(function (DuplicateTransactionException $e, $request) {
             return response()->json([
@@ -92,6 +106,7 @@ class Handler extends ExceptionHandler
                 ($request->wantsJson() || $request->is('api/*'))
                 && !($e instanceof ValidationException)
                 && !($e instanceof InsufficientFundsException)
+                && !($e instanceof AccountAlreadyExistsException)
                 && !($e instanceof DuplicateTransactionException)
                 && !($e instanceof ModelNotFoundException)
                 && !($e instanceof NotFoundHttpException)

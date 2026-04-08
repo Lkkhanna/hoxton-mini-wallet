@@ -18,7 +18,8 @@ const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Response interceptor for consistent error handling
+// Normalize successful responses to the shared API envelope and attach a
+// structured apiError object so components do not need axios-specific parsing.
 apiClient.interceptors.response.use(
   response => response.data,
   error => {
@@ -61,8 +62,8 @@ export default {
     return apiClient.get(`/accounts/${accountId}/balance`);
   },
 
-  getTransactions(accountId) {
-    return apiClient.get(`/accounts/${accountId}/transactions`);
+  getTransactions(accountId, params = {}) {
+    return apiClient.get(`/accounts/${accountId}/transactions`, { params });
   },
 
   // ─── Transfer API ────────────────────────────────────────────

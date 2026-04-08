@@ -1,11 +1,26 @@
 <template>
   <div class="card" id="transfer-form">
     <div class="card-title">
-      <span>💸</span> Transfer Money
+      Transfers
+    </div>
+
+    <p class="transfer-intro">
+      Move funds between accounts with protected retries and clear transfer review details.
+    </p>
+
+    <div v-if="selectedAccount" class="transfer-context">
+      <div>
+        <span class="transfer-context-label">Funding from</span>
+        <strong>{{ selectedAccount.account_id }}</strong>
+        <p>{{ selectedAccount.name || 'Primary operating account' }}</p>
+      </div>
+      <div class="transfer-context-balance">
+        <span>Available</span>
+        <strong>{{ formattedAvailableBalance }}</strong>
+      </div>
     </div>
 
     <form @submit.prevent="handleSubmit">
-      <!-- From Account -->
       <div class="form-group">
         <label for="transfer-from">From Account</label>
         <select
@@ -25,7 +40,6 @@
         </select>
       </div>
 
-      <!-- To Account -->
       <div class="form-group">
         <label for="transfer-to">To Account</label>
         <select
@@ -45,27 +59,33 @@
         </select>
       </div>
 
-      <!-- Amount -->
       <div class="form-group">
         <label for="transfer-amount">Amount ($)</label>
-        <input
-          id="transfer-amount"
-          type="number"
-          class="form-input"
-          v-model="form.amount"
-          min="0.01"
-          step="0.01"
-          placeholder="0.00"
-          required
-        />
+        <div class="amount-field">
+          <span>$</span>
+          <input
+            id="transfer-amount"
+            type="number"
+            class="form-input amount-input"
+            v-model="form.amount"
+            min="0.01"
+            step="0.01"
+            placeholder="0.00"
+            required
+          />
+        </div>
       </div>
 
-      <!-- Validation Message -->
       <div v-if="validationError" class="error-message" style="margin-bottom: 16px;">
         {{ validationError }}
       </div>
 
-      <!-- Submit -->
+      <div class="transfer-summary">
+        <span class="transfer-summary-label">Transfer review</span>
+        <strong>{{ summaryHeadline }}</strong>
+        <span>{{ summaryLabel }}</span>
+      </div>
+
       <button
         id="btn-transfer"
         type="submit"
@@ -73,8 +93,7 @@
         :disabled="!isValid || loading"
       >
         <span v-if="loading" class="spinner" style="border-top-color: white;"></span>
-        <span v-else>⚡</span>
-        {{ loading ? 'Processing...' : 'Send Transfer' }}
+        {{ loading ? 'Processing transfer...' : 'Submit transfer' }}
       </button>
     </form>
   </div>
@@ -86,6 +105,8 @@ export default {
   props: {
     accounts: { type: Array, default: () => [] },
     selectedAccountId: { type: String, default: null },
+    selectedAccount: { type: Object, default: null },
+    availableBalance: { type: String, default: null },
     loading: { type: Boolean, default: false },
     resetKey: { type: Number, default: 0 },
   },
@@ -101,9 +122,41 @@ export default {
   },
 
   computed: {
-    // Filter out the source account from destinations (prevent self-transfer)
     availableDestinations() {
       return this.accounts.filter(a => a.account_id !== this.form.fromAccountId);
+    },
+
+    formattedAvailableBalance() {
+      if (this.availableBalance === null) return 'Awaiting balance';
+      return Number.parseFloat(this.availableBalance || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    },
+
+    summaryHeadline() {
+      if (!this.form.fromAccountId) return 'Select a source account';
+      if (!this.form.toAccountId) return `Funding will leave ${this.form.fromAccountId}`;
+      if (!this.form.amount) return `Route ready: ${this.form.fromAccountId} to ${this.form.toAccountId}`;
+      return `Move $${Number.parseFloat(this.form.amount || 0).toFixed(2)} to ${this.form.toAccountId}`;
+    },
+
+    summaryLabel() {
+      if (!this.form.fromAccountId) {
+        return 'Choose the account that should fund this transfer.';
+      }
+
+      if (!this.form.toAccountId) {
+        return `Select the destination account for funds leaving ${this.form.fromAccountId}.`;
+      }
+
+      if (!this.form.amount) {
+        return `Enter the amount you want to move from ${this.form.fromAccountId}.`;
+      }
+
+      return `Prepared to move funds from ${this.form.fromAccountId} to ${this.form.toAccountId}.`;
     },
 
     validationError() {
@@ -129,7 +182,6 @@ export default {
   },
 
   watch: {
-    // Auto-fill "from" when a global account is selected
     selectedAccountId: {
       immediate: true,
       handler(newVal) {
@@ -166,5 +218,93 @@ export default {
 </script>
 
 <style scoped>
-/* Transfer form inherits global form styles */
+.transfer-intro {
+  margin-bottom: 18px;
+  color: var(--color-ink-soft);
+  font-size: 0.92rem;
+}
+
+.transfer-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  border-radius: 20px;
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.12);
+}
+
+.transfer-context-label,
+.transfer-context-balance span,
+.transfer-summary-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.transfer-context strong,
+.transfer-context-balance strong,
+.transfer-summary strong {
+  display: block;
+  color: var(--color-ink);
+}
+
+.transfer-context p {
+  color: var(--color-ink-soft);
+  font-size: 0.86rem;
+}
+
+.transfer-context-balance {
+  text-align: right;
+}
+
+.amount-field {
+  position: relative;
+}
+
+.amount-field span {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-ink-soft);
+  font-weight: 700;
+}
+
+.amount-input {
+  padding-left: 36px;
+}
+
+.transfer-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--color-primary);
+  font-size: 0.86rem;
+}
+
+.transfer-summary span {
+  color: var(--color-ink-soft);
+}
+
+@media (max-width: 640px) {
+  .transfer-context {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .transfer-context-balance {
+    text-align: left;
+  }
+}
 </style>

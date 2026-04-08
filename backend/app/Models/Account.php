@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Account extends Model
 {
@@ -22,7 +22,7 @@ class Account extends Model
                 'accounts.created_at',
                 'accounts.updated_at'
             )
-            ->selectRaw("
+            ->selectRaw(" 
                 COALESCE(SUM(CASE
                     WHEN ledger_entries.entry_type = 'credit' THEN ledger_entries.amount
                     WHEN ledger_entries.entry_type = 'debit' THEN -ledger_entries.amount
@@ -65,11 +65,11 @@ class Account extends Model
     public function getBalanceAttribute(): string
     {
         if (array_key_exists('balance', $this->attributes)) {
-            return number_format((float) $this->attributes['balance'], 2, '.', '');
+            return $this->formatDecimalString($this->attributes['balance']);
         }
 
         $balance = $this->ledgerEntries()
-            ->selectRaw("
+            ->selectRaw(" 
                 COALESCE(SUM(CASE 
                     WHEN entry_type = 'credit' THEN amount 
                     WHEN entry_type = 'debit' THEN -amount 
@@ -78,6 +78,33 @@ class Account extends Model
             ")
             ->value('balance');
 
-        return number_format((float) $balance, 2, '.', '');
+        return $this->formatDecimalString($balance);
+    }
+
+    protected function formatDecimalString($value): string
+    {
+        $stringValue = trim((string) ($value ?? '0'));
+
+        if ($stringValue === '') {
+            return '0.00';
+        }
+
+        $negative = str_starts_with($stringValue, '-');
+        $unsignedValue = ltrim($stringValue, '+-');
+
+        if ($unsignedValue === '') {
+            return '0.00';
+        }
+
+        [$wholePart, $fractionPart] = array_pad(explode('.', $unsignedValue, 2), 2, '');
+
+        $wholePart = preg_replace('/\D/', '', $wholePart ?? '') ?? '';
+        $fractionPart = preg_replace('/\D/', '', $fractionPart ?? '') ?? '';
+
+        $wholePart = ltrim($wholePart, '0');
+        $wholePart = $wholePart === '' ? '0' : $wholePart;
+        $fractionPart = str_pad(substr($fractionPart, 0, 2), 2, '0');
+
+        return ($negative ? '-' : '') . $wholePart . '.' . $fractionPart;
     }
 }

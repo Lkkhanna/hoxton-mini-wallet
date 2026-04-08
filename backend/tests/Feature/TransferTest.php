@@ -218,6 +218,27 @@ class TransferTest extends TestCase
                  ->assertJsonValidationErrors('transaction_id');
     }
 
+
+    /** @test */
+    public function it_normalizes_decimal_string_amounts_without_losing_cents()
+    {
+        $response = $this->postJson('/api/transfers', [
+            'transaction_id'  => 'TXN-DECIMAL',
+            'from_account_id' => 'SENDER',
+            'to_account_id'   => 'RECEIVER',
+            'amount'          => '6.1',
+        ]);
+
+        $response->assertStatus(201)
+                 ->assertJsonPath('data.amount', '6.10');
+
+        $senderBalance = $this->getJson('/api/accounts/SENDER/balance');
+        $senderBalance->assertJsonPath('data.balance', '993.90');
+
+        $receiverBalance = $this->getJson('/api/accounts/RECEIVER/balance');
+        $receiverBalance->assertJsonPath('data.balance', '6.10');
+    }
+
     /** @test */
     public function it_handles_exact_balance_transfer()
     {

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
-            $table->string('account_id', 50)->unique();
+            $table->string('account_id', 10)->unique();
             $table->string('name', 100)->nullable();
             $table->timestamps();
 

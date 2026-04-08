@@ -7,7 +7,7 @@
       id="notification-toast"
       @click="$emit('close')"
     >
-      <span class="toast-icon">{{ icon }}</span>
+      <span class="toast-badge">{{ badgeLabel }}</span>
       <span class="toast-message">{{ message }}</span>
       <button class="toast-close">&times;</button>
     </div>
@@ -20,15 +20,15 @@ export default {
   props: {
     show: { type: Boolean, default: false },
     message: { type: String, default: '' },
-    type: { type: String, default: 'info' }, // 'success' | 'error' | 'info'
+    type: { type: String, default: 'info' },
   },
 
   computed: {
-    icon() {
+    badgeLabel() {
       switch (this.type) {
-        case 'success': return '✅';
-        case 'error':   return '❌';
-        default:        return 'ℹ️';
+        case 'success': return 'Success';
+        case 'error': return 'Alert';
+        default: return 'Update';
       }
     },
   },
@@ -42,40 +42,45 @@ export default {
   right: 24px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 20px;
+  gap: 12px;
+  padding: 14px 18px;
   border-radius: var(--radius-md);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   z-index: 2000;
   max-width: 450px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 18px 38px rgba(8, 26, 44, 0.18);
   backdrop-filter: blur(12px);
   border: 1px solid;
 }
 
 .toast.success {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.3);
-  color: #34d399;
+  background: rgba(250, 252, 246, 0.9);
+  border-color: rgba(20, 125, 100, 0.2);
+  color: var(--color-success);
 }
 
 .toast.error {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  background: rgba(255, 249, 247, 0.92);
+  border-color: rgba(180, 83, 76, 0.22);
+  color: var(--color-danger);
 }
 
 .toast.info {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
-  color: #a5b4fc;
+  background: rgba(255, 252, 246, 0.92);
+  border-color: rgba(15, 118, 110, 0.2);
+  color: var(--color-primary);
 }
 
-.toast-icon {
-  font-size: 16px;
-  flex-shrink: 0;
+.toast-badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid currentColor;
 }
 
 .toast-message {
@@ -97,7 +102,6 @@ export default {
   opacity: 1;
 }
 
-/* ─── Transition ───────────────────────────────────────────────── */
 .toast-slide-enter-active {
   transition: all 0.3s ease-out;
 }

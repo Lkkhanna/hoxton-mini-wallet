@@ -25,7 +25,11 @@ A minimal full-stack financial system that simulates account management, money t
 git clone https://github.com/YOUR_USERNAME/hoxton-mini-wallet.git
 cd hoxton-mini-wallet
 
-# 2. Build and start all services
+# 2. Create local environment files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# 3. Build and start all services
 docker-compose up --build
 
 # Or use the Makefile
@@ -42,6 +46,13 @@ make up
 | MySQL     | localhost:3306               |
 
 > **Note:** The first startup takes ~60 seconds as it builds containers, installs dependencies, runs migrations, and seeds the database with 3 demo accounts.
+
+### Environment Configuration
+
+- `backend/.env` is the primary Laravel application config
+- `frontend/.env` is the primary frontend runtime config
+- `docker-compose.yml` is intentionally limited to container orchestration concerns
+- for Docker, the backend uses `DB_HOST=db`; if you run Laravel outside Docker, switch that host accordingly
 
 ### Default Seeded Accounts
 
@@ -87,8 +98,9 @@ Content-Type: application/json
   "name": "Diana Prince"
 }
 ```
-**Response 201:** Created account object  
-**Response 422:** Validation errors (duplicate ID, invalid format)
+**Response 201:** Created account object with normalized `account_id` and zero balance  
+**Response 409:** Account already exists  
+**Response 422:** Validation errors (invalid format, missing required fields)
 
 ### 3. Get Balance
 ```
@@ -234,7 +246,7 @@ Three layers ensure a duplicate `transaction_id` never creates duplicate transfe
 
 ### Client-Generated Transaction IDs
 
-The frontend generates UUID v4 for each transfer attempt. If the request fails due to a network error or timeout, the pending transfer metadata is preserved in local storage and reused on retry. This enables:
+The frontend generates UUID v4 for each transfer attempt. For account creation, `account_id` input is canonicalized to uppercase and trimmed on both the client and server before persistence. If the transfer request fails due to a network error or timeout, the pending transfer metadata is preserved in local storage and reused on retry. This enables:
 - **Safe retries:** If a network error occurs after the server processes, the client can retry with the same ID
 - **No server-side ID generation race:** The client owns the uniqueness
 - **Cleaner UX for ambiguous failures:** A duplicate response after retry can be interpreted as "already processed" rather than accidentally creating a second transfer

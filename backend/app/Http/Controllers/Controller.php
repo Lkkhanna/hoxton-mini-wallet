@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountAlreadyExistsException;
 use App\Exceptions\DuplicateTransactionException;
 use App\Exceptions\InsufficientFundsException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -13,10 +14,16 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
+/**
+ * Shared API response helpers used by JSON controllers.
+ */
 class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
+    /**
+     * Build the standard success response envelope.
+     */
     protected function successResponse(
         mixed $data,
         string $message,
@@ -36,6 +43,9 @@ class Controller extends BaseController
         return response()->json($payload, $status);
     }
 
+    /**
+     * Build the standard error response envelope.
+     */
     protected function errorResponse(
         string $message,
         int $status,
@@ -58,6 +68,12 @@ class Controller extends BaseController
         return response()->json($payload, $status);
     }
 
+    /**
+     * Map known domain/framework exceptions to the API response contract.
+     *
+     * Validation and business-rule failures are translated into predictable client
+     * responses, while unexpected failures fall back to a generic 500 payload.
+     */
     protected function exceptionResponse(
         Throwable $e,
         string $fallbackMessage = 'An unexpected server error occurred.'
@@ -67,6 +83,15 @@ class Controller extends BaseController
                 'The given data was invalid.',
                 $e->status,
                 $e->errors()
+            );
+        }
+
+        if ($e instanceof AccountAlreadyExistsException) {
+            return $this->errorResponse(
+                $e->getMessage(),
+                409,
+                ['account_id' => [$e->getMessage()]],
+                ['account_id' => $e->getAccountId()]
             );
         }
 
@@ -99,6 +124,8 @@ class Controller extends BaseController
                 $e->getStatusCode()
             );
         }
+
+        report($e);
 
         return $this->errorResponse($fallbackMessage, 500);
     }

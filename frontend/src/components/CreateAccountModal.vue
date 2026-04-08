@@ -1,9 +1,12 @@
 <template>
   <transition name="modal-fade">
-    <div v-if="show" class="modal-overlay" @click.self="$emit('close')">
+      <div v-if="show" class="modal-overlay" @click.self="$emit('close')">
       <div class="modal-content card" id="create-account-modal">
         <div class="modal-header">
-          <h2>Create New Account</h2>
+          <div>
+            <p class="modal-kicker">Open relationship</p>
+            <h2>Create New Account</h2>
+          </div>
           <button class="modal-close" @click="$emit('close')">&times;</button>
         </div>
 
@@ -16,7 +19,7 @@
               class="form-input"
               v-model="form.accountId"
               placeholder="e.g. ACC004"
-              maxlength="50"
+              maxlength="10"
               pattern="[A-Za-z0-9_-]+"
               required
               ref="accountIdInput"
@@ -63,6 +66,8 @@
 
 <script>
 export default {
+  // The modal keeps account creation lightweight, while canonicalization stays
+  // consistent with the backend by uppercasing the account_id before submit.
   name: 'CreateAccountModal',
   props: {
     show: { type: Boolean, default: false },
@@ -79,6 +84,7 @@ export default {
   },
 
   watch: {
+    // Reset modal state on each open so stale input never leaks between attempts.
     show(newVal) {
       if (newVal) {
         this.form.accountId = '';
@@ -93,11 +99,13 @@ export default {
   },
 
   methods: {
+    // Keep the emitted payload canonical and trimmed so the view and API are
+    // working with the same account identifier format.
     handleSubmit() {
       if (!this.form.accountId.trim() || this.loading) return;
 
       this.$emit('create', {
-        accountId: this.form.accountId.trim(),
+        accountId: this.form.accountId.trim().toUpperCase(),
         name: this.form.name.trim() || null,
       });
     },
@@ -109,8 +117,8 @@ export default {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(4, 24, 41, 0.48);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -132,24 +140,34 @@ export default {
 }
 
 .modal-header h2 {
-  font-size: 18px;
+  font-family: var(--font-family-display);
+  font-size: 2rem;
+  line-height: 0.95;
   font-weight: 600;
 }
 
+.modal-kicker {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-primary);
+  margin-bottom: 6px;
+}
+
 .modal-close {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(13, 34, 56, 0.08);
+  color: var(--color-ink-soft);
   font-size: 24px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
   transition: var(--transition);
 }
 
 .modal-close:hover {
-  color: var(--color-text);
-  background: var(--color-bg-card-hover);
+  color: var(--color-ink);
+  background: #fff;
 }
 
 .modal-actions {
@@ -162,11 +180,10 @@ export default {
 .form-hint {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  color: var(--color-muted);
 }
 
-/* ─── Transition ───────────────────────────────────────────────── */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.2s ease;

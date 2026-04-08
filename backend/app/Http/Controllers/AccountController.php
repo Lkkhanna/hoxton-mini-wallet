@@ -2,29 +2,32 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Account;
-use App\Models\LedgerEntry;
 use App\Http\Requests\CreateAccountRequest;
 use App\Http\Resources\AccountResource;
 use App\Http\Resources\LedgerEntryResource;
+use App\Models\Account;
+use App\Models\LedgerEntry;
+use App\Services\AccountService;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Handles account-oriented API endpoints such as listing, creation, balance,
+ * and transaction history.
+ */
 class AccountController extends Controller
 {
-    protected TransferService $transferService;
-
-    public function __construct(TransferService $transferService)
-    {
-        $this->transferService = $transferService;
+    public function __construct(
+        protected TransferService $transferService,
+        protected AccountService $accountService
+    ) {
     }
 
     /**
-     * List all accounts with their current balances.
-     *
-     * GET /api/accounts
+     * Return the list of accounts with derived balances.
      */
     public function index(): JsonResponse
     {
@@ -55,16 +58,17 @@ class AccountController extends Controller
     }
 
     /**
-     * Create a new account.
+     * Create a new wallet account.
      *
-     * POST /api/accounts
+     * @param CreateAccountRequest $request
+     * @return JsonResponse
      */
     public function store(CreateAccountRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
         try {
-            $account = Account::create($validated);
+            $account = $this->accountService->createAccount($validated);
 
             Log::info('Account created successfully.', [
                 'account_id' => $account->account_id,
@@ -87,10 +91,7 @@ class AccountController extends Controller
     }
 
     /**
-     * Get the current balance for an account.
-     * Balance is derived from the sum of all ledger entries.
-     *
-     * GET /api/accounts/{account_id}/balance
+     * Return the balance for a single account.
      */
     public function balance(string $accountId): JsonResponse
     {
@@ -107,7 +108,7 @@ class AccountController extends Controller
             return $this->successResponse(
                 [
                     'account_id' => $account->account_id,
-                    'balance'    => $balance,
+                    'balance' => $balance,
                 ],
                 'Account balance retrieved successfully.'
             );
@@ -123,15 +124,15 @@ class AccountController extends Controller
     }
 
     /**
-     * Get transaction history for an account.
-     * Returns ledger entries ordered by most recent first.
-     *
-     * GET /api/accounts/{account_id}/transactions
+     * Return paginated transaction history for a single account.
      */
-    public function transactions(string $accountId): JsonResponse
+    public function transactions(Request $request, string $accountId): JsonResponse
     {
         try {
             Account::where('account_id', $accountId)->firstOrFail();
+
+            $perPage = (int) $request->query('per_page', 10);
+            $perPage = max(1, min($perPage, 50));
 
             $entries = LedgerEntry::where('account_id', $accountId)
                 ->select([
@@ -145,17 +146,29 @@ class AccountController extends Controller
                 ])
                 ->orderBy('created_at', 'desc')
                 ->orderBy('id', 'desc')
-                ->limit(100)
-                ->get();
+                ->paginate($perPage);
 
             Log::info('Transaction history retrieved successfully.', [
                 'account_id' => $accountId,
                 'transaction_count' => $entries->count(),
+                'page' => $entries->currentPage(),
+                'per_page' => $entries->perPage(),
             ]);
 
             return $this->successResponse(
-                LedgerEntryResource::collection($entries)->resolve(),
-                'Transaction history retrieved successfully.'
+                LedgerEntryResource::collection($entries->items())->resolve(),
+                'Transaction history retrieved successfully.',
+                200,
+                [
+                    'pagination' => [
+                        'current_page' => $entries->currentPage(),
+                        'last_page' => $entries->lastPage(),
+                        'per_page' => $entries->perPage(),
+                        'total' => $entries->total(),
+                        'from' => $entries->firstItem(),
+                        'to' => $entries->lastItem(),
+                    ],
+                ]
             );
         } catch (Throwable $e) {
             Log::error('Failed to retrieve transaction history.', [

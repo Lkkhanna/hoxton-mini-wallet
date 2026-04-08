@@ -1,56 +1,88 @@
 <template>
   <div class="card transaction-card" id="transaction-list">
     <div class="card-title">
-      <span>📋</span> Transaction History
-      <span v-if="transactions.length" class="tx-count">{{ transactions.length }}</span>
+      Transaction history
+      <span v-if="pagination.total" class="tx-count">{{ pagination.total }}</span>
     </div>
 
-    <!-- No account selected -->
     <div v-if="!accountId" class="empty-state">
-      <div class="empty-icon">📊</div>
-      <p>Select an account to view transactions</p>
+      <div class="empty-icon">01</div>
+      <p>Select an account to unlock the activity feed.</p>
     </div>
 
-    <!-- Loading -->
     <div v-else-if="loading" class="loading-container">
       <span class="spinner"></span>
       <span>Loading transactions...</span>
     </div>
 
-    <!-- Error -->
     <div v-else-if="error" class="error-message">
       {{ error }}
     </div>
 
-    <!-- Empty -->
     <div v-else-if="transactions.length === 0" class="empty-state">
-      <div class="empty-icon">📭</div>
-      <p>No transactions yet</p>
+      <div class="empty-icon">0</div>
+      <p>No transactions to display.</p>
     </div>
 
-    <!-- Transaction List -->
-    <div v-else class="tx-list">
-      <div
-        v-for="tx in transactions"
-        :key="tx.id"
-        class="tx-item"
-        :class="tx.type"
-      >
-        <div class="tx-left">
-          <div class="tx-type-badge" :class="tx.type">
-            {{ tx.type === 'credit' ? '↓' : '↑' }}
+    <div v-else>
+      <div class="tx-list">
+        <div
+          v-for="tx in transactions"
+          :key="tx.id"
+          class="tx-item"
+          :class="tx.type"
+          role="button"
+          tabindex="0"
+          @click="$emit('transaction-selected', tx)"
+          @keydown.enter.prevent="$emit('transaction-selected', tx)"
+          @keydown.space.prevent="$emit('transaction-selected', tx)"
+        >
+          <div class="tx-left">
+            <div class="tx-type-badge" :class="tx.type">
+              {{ tx.type === 'credit' ? '↓' : '↑' }}
+            </div>
+            <div class="tx-details">
+              <div class="tx-description">{{ tx.description || formatDescription(tx) }}</div>
+              <div class="tx-meta">
+                <span class="tx-counterparty">{{ tx.type === 'credit' ? 'From' : 'To' }} {{ tx.counterparty }}</span>
+                <span class="tx-dot">·</span>
+                <span class="tx-id" :title="tx.transaction_id">{{ truncateId(tx.transaction_id) }}</span>
+                <span class="tx-dot">·</span>
+                <span class="tx-time">{{ formatTime(tx.timestamp) }}</span>
+              </div>
+            </div>
           </div>
-          <div class="tx-details">
-            <div class="tx-description">{{ tx.description || formatDescription(tx) }}</div>
-            <div class="tx-meta">
-              <span class="tx-id" :title="tx.transaction_id">{{ truncateId(tx.transaction_id) }}</span>
-              <span class="tx-dot">·</span>
-              <span class="tx-time">{{ formatTime(tx.timestamp) }}</span>
+          <div class="tx-right">
+            <span class="tx-kind" :class="tx.type">{{ tx.type }}</span>
+            <div class="tx-amount" :class="tx.type">
+              {{ tx.type === 'credit' ? '+' : '-' }}${{ formatAmount(tx.amount) }}
             </div>
           </div>
         </div>
-        <div class="tx-amount" :class="tx.type">
-          {{ tx.type === 'credit' ? '+' : '-' }}${{ formatAmount(tx.amount) }}
+      </div>
+
+      <div v-if="pagination.lastPage > 1" class="tx-pagination">
+        <div class="tx-pagination-summary">
+          Showing {{ pagination.from }}-{{ pagination.to }} of {{ pagination.total }}
+        </div>
+        <div class="tx-pagination-actions">
+          <button
+            class="btn btn-secondary btn-sm"
+            :disabled="pagination.currentPage <= 1"
+            @click="$emit('page-change', pagination.currentPage - 1)"
+          >
+            Previous
+          </button>
+          <span class="tx-page-indicator">
+            Page {{ pagination.currentPage }} of {{ pagination.lastPage }}
+          </span>
+          <button
+            class="btn btn-secondary btn-sm"
+            :disabled="pagination.currentPage >= pagination.lastPage"
+            @click="$emit('page-change', pagination.currentPage + 1)"
+          >
+            Next
+          </button>
         </div>
       </div>
     </div>
@@ -63,6 +95,17 @@ export default {
   props: {
     accountId: { type: String, default: null },
     transactions: { type: Array, default: () => [] },
+    pagination: {
+      type: Object,
+      default: () => ({
+        currentPage: 1,
+        lastPage: 1,
+        perPage: 10,
+        total: 0,
+        from: null,
+        to: null,
+      }),
+    },
     loading: { type: Boolean, default: false },
     error: { type: String, default: null },
   },
@@ -112,55 +155,68 @@ export default {
 }
 
 .tx-count {
-  background: var(--color-primary-bg);
+  background: var(--color-secondary-soft);
   color: var(--color-primary);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
   margin-left: auto;
 }
 
 .empty-state {
   text-align: center;
   padding: 48px 20px;
-  color: var(--color-text-muted);
+  color: var(--color-muted);
 }
 
 .empty-icon {
-  font-size: 40px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: 800;
   margin-bottom: 12px;
-  opacity: 0.5;
 }
 
 .empty-state p {
-  font-size: 14px;
+  font-size: 0.92rem;
 }
 
-/* ─── Transaction Items ────────────────────────────────────────── */
 .tx-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
 }
 
 .tx-item {
   display: flex;
   align-items: center;
+  gap: 16px;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  border-radius: 20px;
   transition: var(--transition);
-  border: 1px solid transparent;
+  border: 1px solid rgba(13, 34, 56, 0.08);
+  background: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+  outline: none;
 }
 
-.tx-item:hover {
-  background: var(--color-bg-card-hover);
-  border-color: var(--color-border);
+.tx-item:hover,
+.tx-item:focus {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(13, 34, 56, 0.14);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.08);
 }
 
 .tx-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   min-width: 0;
   flex: 1;
@@ -193,9 +249,9 @@ export default {
 }
 
 .tx-description {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--color-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -206,29 +262,62 @@ export default {
   align-items: center;
   gap: 6px;
   margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.tx-counterparty {
+  font-size: 0.74rem;
+  color: var(--color-ink-soft);
+  font-weight: 700;
 }
 
 .tx-id {
-  font-size: 11px;
-  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  color: var(--color-muted);
   font-family: monospace;
 }
 
 .tx-dot {
-  color: var(--color-text-muted);
+  color: var(--color-muted);
   font-size: 10px;
 }
 
 .tx-time {
-  font-size: 11px;
-  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  color: var(--color-muted);
+}
+
+.tx-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.tx-kind {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tx-kind.credit {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.tx-kind.debit {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .tx-amount {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 1.08rem;
+  font-weight: 800;
   white-space: nowrap;
-  margin-left: 16px;
 }
 
 .tx-amount.credit {
@@ -237,5 +326,45 @@ export default {
 
 .tx-amount.debit {
   color: var(--color-danger);
+}
+
+.tx-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(13, 34, 56, 0.08);
+}
+
+.tx-pagination-summary,
+.tx-page-indicator {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.tx-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .tx-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tx-right {
+    align-items: flex-start;
+    margin-left: 48px;
+  }
+
+  .tx-pagination,
+  .tx-pagination-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

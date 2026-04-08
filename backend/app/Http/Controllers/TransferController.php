@@ -8,6 +8,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Handles transfer submission endpoints.
+ */
 class TransferController extends Controller
 {
     protected TransferService $transferService;
@@ -19,8 +22,6 @@ class TransferController extends Controller
 
     /**
      * Execute a money transfer between two accounts.
-     *
-     * POST /api/transfers
      *
      * The transfer is:
      * - Atomic (both debit and credit succeed or fail together)
