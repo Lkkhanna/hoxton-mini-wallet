@@ -15,7 +15,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:8080', 'http://127.0.0.1:8080'],
+    'allowed_origins' => ['http://localhost:8080', 'http://127.0.0.1:8080', 'https://hoxton-mini-wallet-2.onrender.com'],
 
     'allowed_origins_patterns' => [],
 
