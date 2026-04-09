@@ -2,9 +2,10 @@
   <div class="card" id="account-selector">
     <div class="card-title">
       Account
+      <span v-if="loading && accounts.length" class="account-refreshing">Refreshing</span>
     </div>
 
-    <div v-if="loading" class="loading-container">
+    <div v-if="showBlockingLoader" class="loading-container">
       <span class="spinner"></span>
       <span>Loading accounts...</span>
     </div>
@@ -73,6 +74,10 @@ export default {
   },
 
   computed: {
+    showBlockingLoader() {
+      return this.loading && this.accounts.length === 0;
+    },
+
     formattedBalance() {
       if (this.selectedBalance === null) return 'Awaiting refresh';
       return Number.parseFloat(this.selectedBalance || 0).toLocaleString('en-US', {
@@ -87,6 +92,17 @@ export default {
 </script>
 
 <style scoped>
+.account-refreshing {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .selected-account-panel {
   display: flex;
   align-items: center;
