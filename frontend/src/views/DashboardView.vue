@@ -54,7 +54,7 @@
 
         <div class="overview-metrics">
           <div class="overview-stat">
-            <span>Balance</span>
+            <span>Account Balance</span>
             <strong>{{ selectedAccountId && balance !== null ? formatCurrency(balance) : 'Awaiting selection' }}</strong>
           </div>
           <div class="overview-stat">

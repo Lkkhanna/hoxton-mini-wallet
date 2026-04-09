@@ -11,6 +11,7 @@ use App\Services\AccountService;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -77,7 +78,7 @@ class AccountController extends Controller
             return $this->successResponse(
                 (new AccountResource($account))->resolve(),
                 'Account created successfully.',
-                201
+                Response::HTTP_CREATED
             );
         } catch (Throwable $e) {
             Log::error('Failed to create account.', [
@@ -158,7 +159,7 @@ class AccountController extends Controller
             return $this->successResponse(
                 LedgerEntryResource::collection($entries->items())->resolve(),
                 'Transaction history retrieved successfully.',
-                200,
+                Response::HTTP_OK,
                 [
                     'pagination' => [
                         'current_page' => $entries->currentPage(),

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller as BaseController;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -27,7 +28,7 @@ class Controller extends BaseController
     protected function successResponse(
         mixed $data,
         string $message,
-        int $status = 200,
+        int $status = Response::HTTP_OK,
         array $meta = []
     ): JsonResponse {
         $payload = [
@@ -89,7 +90,7 @@ class Controller extends BaseController
         if ($e instanceof AccountAlreadyExistsException) {
             return $this->errorResponse(
                 $e->getMessage(),
-                409,
+                Response::HTTP_CONFLICT,
                 ['account_id' => [$e->getMessage()]],
                 ['account_id' => $e->getAccountId()]
             );
@@ -98,7 +99,7 @@ class Controller extends BaseController
         if ($e instanceof InsufficientFundsException) {
             return $this->errorResponse(
                 $e->getMessage(),
-                422,
+                Response::HTTP_UNPROCESSABLE_ENTITY,
                 ['amount' => [$e->getMessage()]]
             );
         }
@@ -106,7 +107,7 @@ class Controller extends BaseController
         if ($e instanceof DuplicateTransactionException) {
             return $this->errorResponse(
                 $e->getMessage(),
-                409,
+                Response::HTTP_CONFLICT,
                 $e->isConflictingRequest()
                     ? ['transaction_id' => [$e->getMessage()]]
                     : [],
@@ -115,7 +116,7 @@ class Controller extends BaseController
         }
 
         if ($e instanceof ModelNotFoundException) {
-            return $this->errorResponse('Resource not found.', 404);
+            return $this->errorResponse('Resource not found.', Response::HTTP_NOT_FOUND);
         }
 
         if ($e instanceof HttpExceptionInterface) {
@@ -127,6 +128,6 @@ class Controller extends BaseController
 
         report($e);
 
-        return $this->errorResponse($fallbackMessage, 500);
+        return $this->errorResponse($fallbackMessage, Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 }

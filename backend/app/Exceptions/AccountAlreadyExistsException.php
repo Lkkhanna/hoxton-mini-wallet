@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Exception;
+use Symfony\Component\HttpFoundation\Response;
 
 class AccountAlreadyExistsException extends Exception
 {
@@ -14,7 +15,7 @@ class AccountAlreadyExistsException extends Exception
 
         parent::__construct(
             "Account '{$accountId}' already exists.",
-            409
+            Response::HTTP_CONFLICT
         );
     }
 

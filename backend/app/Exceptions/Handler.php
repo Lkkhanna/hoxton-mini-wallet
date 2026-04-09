@@ -10,6 +10,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
+use Symfony\Component\HttpFoundation\Response;
 
 class Handler extends ExceptionHandler
 {
@@ -37,7 +38,7 @@ class Handler extends ExceptionHandler
                 'errors'  => [
                     'amount' => [$e->getMessage()],
                 ],
-            ], 422);
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         });
 
         // Handle account creation conflicts
@@ -51,7 +52,7 @@ class Handler extends ExceptionHandler
                 'data' => [
                     'account_id' => $e->getAccountId(),
                 ],
-            ], 409);
+            ], Response::HTTP_CONFLICT);
         });
 
         // Handle duplicate transactions (idempotency)
@@ -67,7 +68,7 @@ class Handler extends ExceptionHandler
                 'data'    => [
                     'transaction_id' => $e->getTransactionId(),
                 ],
-            ], 409);
+            ], Response::HTTP_CONFLICT);
         });
 
         // Handle model not found (invalid account_id etc.)
@@ -76,7 +77,7 @@ class Handler extends ExceptionHandler
                 return response()->json([
                     'success' => false,
                     'message' => 'Resource not found.',
-                ], 404);
+                ], Response::HTTP_NOT_FOUND);
             }
         });
 
@@ -86,7 +87,7 @@ class Handler extends ExceptionHandler
                 return response()->json([
                     'success' => false,
                     'message' => $e->getMessage() ?: 'The requested endpoint could not be found.',
-                ], 404);
+                ], Response::HTTP_NOT_FOUND);
             }
         });
 
@@ -96,7 +97,7 @@ class Handler extends ExceptionHandler
                 return response()->json([
                     'success' => false,
                     'message' => 'The requested HTTP method is not supported for this endpoint.',
-                ], 405);
+                ], Response::HTTP_METHOD_NOT_ALLOWED);
             }
         });
 
@@ -114,11 +115,11 @@ class Handler extends ExceptionHandler
             ) {
                 $statusCode = $e instanceof HttpExceptionInterface
                     ? $e->getStatusCode()
-                    : 500;
+                    : Response::HTTP_INTERNAL_SERVER_ERROR;
 
                 return response()->json([
                     'success' => false,
-                    'message' => $statusCode >= 500
+                    'message' => $statusCode >= Response::HTTP_INTERNAL_SERVER_ERROR
                         ? 'An unexpected server error occurred.'
                         : ($e->getMessage() ?: 'The request could not be processed.'),
                 ], $statusCode);

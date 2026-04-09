@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Exception;
+use Symfony\Component\HttpFoundation\Response;
 
 class InsufficientFundsException extends Exception
 {
@@ -23,7 +24,7 @@ class InsufficientFundsException extends Exception
             $requestedAmount
         );
 
-        parent::__construct($message, 422);
+        parent::__construct($message, Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     public function getAccountId(): string

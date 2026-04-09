@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Exception;
+use Symfony\Component\HttpFoundation\Response;
 
 class DuplicateTransactionException extends Exception
 {
@@ -18,7 +19,7 @@ class DuplicateTransactionException extends Exception
             $conflictingRequest
                 ? "Transaction '{$transactionId}' has already been used for a different transfer request."
                 : "Transaction '{$transactionId}' has already been processed.",
-            409
+            Response::HTTP_CONFLICT
         );
     }
 

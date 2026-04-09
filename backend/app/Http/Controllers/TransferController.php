@@ -6,6 +6,7 @@ use App\Http\Requests\TransferRequest;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
@@ -55,7 +56,7 @@ class TransferController extends Controller
                 $isReplay
                     ? 'Transfer already existed. Returning the original result.'
                     : 'Transfer completed successfully.',
-                $isReplay ? 200 : 201,
+                $isReplay ? Response::HTTP_OK : Response::HTTP_CREATED,
                 [
                     'idempotency' => [
                         'replayed' => $isReplay,

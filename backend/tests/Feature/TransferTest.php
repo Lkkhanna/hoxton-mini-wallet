@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\LedgerEntry;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class TransferTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
@@ -30,7 +32,7 @@ class TransferTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_transfer_money_between_accounts()
     {
         $response = $this->postJson('/api/transfers', [
@@ -40,7 +42,7 @@ class TransferTest extends TestCase
             'amount'          => 250.00,
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(Response::HTTP_CREATED)
                  ->assertJsonPath('data.status', 'completed')
                  ->assertJsonPath('data.amount', '250.00');
 
@@ -53,7 +55,7 @@ class TransferTest extends TestCase
         $receiverBalance->assertJsonPath('data.balance', '250.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_debit_and_credit_ledger_entries()
     {
         $this->postJson('/api/transfers', [
@@ -64,7 +66,8 @@ class TransferTest extends TestCase
         ]);
 
         // Two entries for the transfer + 1 seed entry
-        $this->assertDatabaseCount('ledger_entries', 3);
+        $this->assertSame(2, LedgerEntry::where('transaction_id', 'TXN-LEDGER')->count());
+
 
         // Debit entry for sender
         $this->assertDatabaseHas('ledger_entries', [
@@ -83,7 +86,7 @@ class TransferTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_duplicate_transactions_idempotency()
     {
         // First transfer should succeed
@@ -93,7 +96,7 @@ class TransferTest extends TestCase
             'to_account_id'   => 'RECEIVER',
             'amount'          => 100.00,
         ]);
-        $response1->assertStatus(201);
+        $response1->assertStatus(Response::HTTP_CREATED);
 
         // Same transaction_id with the same payload should be replayed safely
         $response2 = $this->postJson('/api/transfers', [
@@ -102,7 +105,7 @@ class TransferTest extends TestCase
             'to_account_id'   => 'RECEIVER',
             'amount'          => 100.00,
         ]);
-        $response2->assertStatus(200)
+        $response2->assertStatus(Response::HTTP_OK)
             ->assertJsonPath('data.idempotency_status', 'replayed')
             ->assertJsonPath('meta.idempotency.replayed', true);
 
@@ -111,7 +114,7 @@ class TransferTest extends TestCase
         $senderBalance->assertJsonPath('data.balance', '900.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_duplicate_transaction_id_when_payload_differs()
     {
         $this->postJson('/api/transfers', [
@@ -119,7 +122,7 @@ class TransferTest extends TestCase
             'from_account_id' => 'SENDER',
             'to_account_id'   => 'RECEIVER',
             'amount'          => 100.00,
-        ])->assertStatus(201);
+        ])->assertStatus(Response::HTTP_CREATED);
 
         $response = $this->postJson('/api/transfers', [
             'transaction_id'  => 'TXN-CONFLICT',
@@ -128,11 +131,11 @@ class TransferTest extends TestCase
             'amount'          => 125.00,
         ]);
 
-        $response->assertStatus(409)
+        $response->assertStatus(Response::HTTP_CONFLICT)
             ->assertJsonValidationErrors('transaction_id');
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_transfer_exceeding_balance()
     {
         $response = $this->postJson('/api/transfers', [
@@ -142,14 +145,14 @@ class TransferTest extends TestCase
             'amount'          => 9999.00,
         ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
 
         // Balance should remain unchanged
         $senderBalance = $this->getJson('/api/accounts/SENDER/balance');
         $senderBalance->assertJsonPath('data.balance', '1000.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_negative_amount()
     {
         $response = $this->postJson('/api/transfers', [
@@ -159,11 +162,11 @@ class TransferTest extends TestCase
             'amount'          => -100.00,
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
                  ->assertJsonValidationErrors('amount');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_zero_amount()
     {
         $response = $this->postJson('/api/transfers', [
@@ -173,11 +176,11 @@ class TransferTest extends TestCase
             'amount'          => 0,
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
                  ->assertJsonValidationErrors('amount');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_self_transfer()
     {
         $response = $this->postJson('/api/transfers', [
@@ -187,11 +190,11 @@ class TransferTest extends TestCase
             'amount'          => 100.00,
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
                  ->assertJsonValidationErrors('to_account_id');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_transfer_from_nonexistent_account()
     {
         $response = $this->postJson('/api/transfers', [
@@ -201,11 +204,11 @@ class TransferTest extends TestCase
             'amount'          => 100.00,
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
                  ->assertJsonValidationErrors('from_account_id');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_transfer_without_transaction_id()
     {
         $response = $this->postJson('/api/transfers', [
@@ -214,12 +217,12 @@ class TransferTest extends TestCase
             'amount'          => 100.00,
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
                  ->assertJsonValidationErrors('transaction_id');
     }
 
 
-    /** @test */
+    #[Test]
     public function it_normalizes_decimal_string_amounts_without_losing_cents()
     {
         $response = $this->postJson('/api/transfers', [
@@ -229,7 +232,7 @@ class TransferTest extends TestCase
             'amount'          => '6.1',
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(Response::HTTP_CREATED)
                  ->assertJsonPath('data.amount', '6.10');
 
         $senderBalance = $this->getJson('/api/accounts/SENDER/balance');
@@ -239,7 +242,7 @@ class TransferTest extends TestCase
         $receiverBalance->assertJsonPath('data.balance', '6.10');
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_exact_balance_transfer()
     {
         $response = $this->postJson('/api/transfers', [
@@ -249,13 +252,13 @@ class TransferTest extends TestCase
             'amount'          => 1000.00,
         ]);
 
-        $response->assertStatus(201);
+        $response->assertStatus(Response::HTTP_CREATED);
 
         $senderBalance = $this->getJson('/api/accounts/SENDER/balance');
         $senderBalance->assertJsonPath('data.balance', '0.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_multiple_sequential_transfers()
     {
         // Transfer 1
@@ -264,7 +267,7 @@ class TransferTest extends TestCase
             'from_account_id' => 'SENDER',
             'to_account_id'   => 'RECEIVER',
             'amount'          => 300.00,
-        ])->assertStatus(201);
+        ])->assertStatus(Response::HTTP_CREATED);
 
         // Transfer 2
         $this->postJson('/api/transfers', [
@@ -272,7 +275,7 @@ class TransferTest extends TestCase
             'from_account_id' => 'SENDER',
             'to_account_id'   => 'RECEIVER',
             'amount'          => 200.00,
-        ])->assertStatus(201);
+        ])->assertStatus(Response::HTTP_CREATED);
 
         // Transfer back
         $this->postJson('/api/transfers', [
@@ -280,7 +283,7 @@ class TransferTest extends TestCase
             'from_account_id' => 'RECEIVER',
             'to_account_id'   => 'SENDER',
             'amount'          => 100.00,
-        ])->assertStatus(201);
+        ])->assertStatus(Response::HTTP_CREATED);
 
         // Verify final balances
         $senderBalance = $this->getJson('/api/accounts/SENDER/balance');
@@ -288,5 +291,34 @@ class TransferTest extends TestCase
 
         $receiverBalance = $this->getJson('/api/accounts/RECEIVER/balance');
         $receiverBalance->assertJsonPath('data.balance', '400.00');
+    }
+
+    #[Test]
+    public function it_rejects_transfer_to_nonexistent_account()
+    {
+        $response = $this->postJson('/api/transfers', [
+            'transaction_id'  => 'TXN-GHOST-TO',
+            'from_account_id' => 'SENDER',
+            'to_account_id'   => 'GHOST999',
+            'amount'          => 100.00,
+        ]);
+
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+                 ->assertJsonValidationErrors('to_account_id');
+    }
+
+    #[Test]
+    public function it_does_not_create_transfer_entries_when_insufficient_funds_transfer_is_rejected()
+    {
+        $response = $this->postJson('/api/transfers', [
+            'transaction_id'  => 'TXN-REJECTED',
+            'from_account_id' => 'SENDER',
+            'to_account_id'   => 'RECEIVER',
+            'amount'          => 9999.00,
+        ]);
+
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
+
+        $this->assertSame(0, LedgerEntry::where('transaction_id', 'TXN-REJECTED')->count());
     }
 }

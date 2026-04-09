@@ -31,6 +31,7 @@ services:
       - ./backend/config/cors.php:/var/www/html/config/cors.php
       - ./backend/tests:/var/www/html/tests
       - ./backend/storage/logs:/var/www/html/storage/logs
+      - ./backend/.env:/var/www/html/.env:ro
     env_file:
       - ./backend/.env
     depends_on:

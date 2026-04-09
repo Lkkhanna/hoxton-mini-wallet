@@ -4,14 +4,16 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\LedgerEntry;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Symfony\Component\HttpFoundation\Response;
 
 class AccountTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
-    /** @test */
+    #[Test]
     public function it_can_create_an_account()
     {
         $response = $this->postJson('/api/accounts', [
@@ -19,7 +21,7 @@ class AccountTest extends TestCase
             'name' => 'Test User',
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(Response::HTTP_CREATED)
             ->assertJsonPath('data.account_id', 'TEST001')
             ->assertJsonPath('data.name', 'Test User')
             ->assertJsonPath('data.balance', '0.00');
@@ -27,7 +29,7 @@ class AccountTest extends TestCase
         $this->assertDatabaseHas('accounts', ['account_id' => 'TEST001']);
     }
 
-    /** @test */
+    #[Test]
     public function it_normalizes_account_creation_input()
     {
         $response = $this->postJson('/api/accounts', [
@@ -35,7 +37,7 @@ class AccountTest extends TestCase
             'name' => '  Test User  ',
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(Response::HTTP_CREATED)
             ->assertJsonPath('data.account_id', 'ACC-001')
             ->assertJsonPath('data.name', 'Test User');
 
@@ -45,7 +47,7 @@ class AccountTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_conflict_when_creating_a_duplicate_account_id()
     {
         Account::create(['account_id' => 'DUP001', 'name' => 'First']);
@@ -55,24 +57,24 @@ class AccountTest extends TestCase
             'name' => 'Second',
         ]);
 
-        $response->assertStatus(409)
+        $response->assertStatus(Response::HTTP_CONFLICT)
             ->assertJsonPath('success', false)
             ->assertJsonPath('data.account_id', 'DUP001')
             ->assertJsonPath('errors.account_id.0', "Account 'DUP001' already exists.");
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_invalid_account_id_format()
     {
         $response = $this->postJson('/api/accounts', [
             'account_id' => 'invalid account!@#',
         ]);
 
-        $response->assertStatus(422)
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors('account_id');
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_balance_as_zero_for_new_account()
     {
         Account::create(['account_id' => 'ZERO001', 'name' => 'Zero Balance']);
@@ -84,7 +86,7 @@ class AccountTest extends TestCase
             ->assertJsonPath('data.balance', '0.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_correct_balance_from_ledger()
     {
         Account::create(['account_id' => 'BAL001', 'name' => 'Balance Test']);
@@ -112,14 +114,14 @@ class AccountTest extends TestCase
             ->assertJsonPath('data.balance', '750.00');
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_404_for_nonexistent_account_balance()
     {
         $response = $this->getJson('/api/accounts/GHOST999/balance');
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_transaction_history()
     {
         Account::create(['account_id' => 'HIST001', 'name' => 'History Test']);
@@ -144,7 +146,7 @@ class AccountTest extends TestCase
             ->assertJsonPath('meta.pagination.total', 1);
     }
 
-    /** @test */
+    #[Test]
     public function it_paginates_transaction_history()
     {
         Account::create(['account_id' => 'PAGE001', 'name' => 'Paged History']);
@@ -173,7 +175,7 @@ class AccountTest extends TestCase
             ->assertJsonPath('meta.pagination.total', 12);
     }
 
-    /** @test */
+    #[Test]
     public function it_lists_all_accounts()
     {
         Account::create(['account_id' => 'LIST001', 'name' => 'First']);
@@ -182,6 +184,15 @@ class AccountTest extends TestCase
         $response = $this->getJson('/api/accounts');
 
         $response->assertStatus(200)
-            ->assertJsonCount(2, 'data');
+            ->assertJsonFragment(['account_id' => 'LIST001'])
+            ->assertJsonFragment(['account_id' => 'LIST002']);
+    }
+
+    #[Test]
+    public function it_returns_404_for_nonexistent_account_transaction_history()
+    {
+        $response = $this->getJson('/api/accounts/GHOST999/transactions');
+
+        $response->assertStatus(404);
     }
 }
