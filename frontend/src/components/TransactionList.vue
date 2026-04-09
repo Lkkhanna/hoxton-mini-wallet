@@ -354,17 +354,49 @@ export default {
   .tx-item {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
   }
 
   .tx-right {
-    align-items: flex-start;
-    margin-left: 48px;
+    width: 100%;
+    margin-left: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-left: 48px;
   }
 
-  .tx-pagination,
-  .tx-pagination-actions {
+  .tx-left {
+    width: 100%;
+  }
+
+  .tx-description {
+    white-space: normal;
+  }
+
+  .tx-pagination {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .tx-pagination-actions {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .tx-pagination-actions .btn {
+    min-width: 0;
+    padding-inline: 14px;
+  }
+
+  .tx-page-indicator {
+    text-align: center;
+    flex: 1;
   }
 }
 </style>

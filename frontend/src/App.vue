@@ -79,9 +79,14 @@ a {
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   padding: 0 32px;
   background: linear-gradient(180deg, #c8f1ef 0%, #bdebe9 100%);
   border-bottom: 1px solid rgba(6, 47, 57, 0.08);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(18, 41, 62, 0.06);
 }
 
 .header-shell,
@@ -98,7 +103,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  min-height: 110px;
+  min-height: 82px;
   color: #062f39;
 }
 
@@ -109,9 +114,9 @@ a {
 }
 
 .brand-logo {
-  width: 244px;
+  width: 218px;
   max-width: 100%;
-  height: 36px;
+  height: 30px;
   display: block;
   flex-shrink: 0;
   object-fit: contain;
@@ -399,7 +404,7 @@ a {
   .header-shell {
     flex-wrap: wrap;
     min-height: auto;
-    padding: 18px 0;
+    padding: 14px 0;
   }
 
   .header-nav {
@@ -443,8 +448,8 @@ a {
   }
 
   .brand-logo {
-    width: 210px;
-    height: 34px;
+    width: 188px;
+    height: 28px;
   }
 
   .mobile-nav-toggle {
