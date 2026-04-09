@@ -424,18 +424,22 @@ a {
     padding: 0 18px;
   }
 
-  .header-shell,
+  .header-shell {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
   .app-footer-inner {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .header-shell {
-    gap: 14px;
-  }
-
   .brand-lockup {
     width: auto;
+    flex: 0 1 auto;
   }
 
   .brand-logo {
@@ -445,11 +449,13 @@ a {
 
   .mobile-nav-toggle {
     display: inline-flex;
-    align-self: flex-end;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .header-nav {
     display: none;
+    order: 3;
     width: 100%;
     flex-direction: column;
     align-items: stretch;
