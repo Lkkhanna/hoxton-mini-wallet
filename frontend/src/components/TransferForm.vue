@@ -8,11 +8,11 @@
       Move funds between accounts with protected retries and clear transfer review details.
     </p>
 
-    <div v-if="selectedAccount" class="transfer-context">
+    <div v-if="sourceAccount" class="transfer-context">
       <div>
         <span class="transfer-context-label">Funding from</span>
-        <strong>{{ selectedAccount.account_id }}</strong>
-        <p>{{ selectedAccount.name || 'Primary operating account' }}</p>
+        <strong>{{ sourceAccount.account_id }}</strong>
+        <p>{{ sourceAccount.name || 'Primary operating account' }}</p>
       </div>
       <div class="transfer-context-balance">
         <span>Available</span>
@@ -126,13 +126,27 @@ export default {
   },
 
   computed: {
+    sourceAccount() {
+      return this.accounts.find(account => account.account_id === this.form.fromAccountId) || null;
+    },
+
     availableDestinations() {
       return this.accounts.filter(a => a.account_id !== this.form.fromAccountId);
     },
 
+    sourceAvailableBalance() {
+      if (!this.sourceAccount) return null;
+
+      if (this.selectedAccountId === this.form.fromAccountId && this.availableBalance !== null) {
+        return this.availableBalance;
+      }
+
+      return this.sourceAccount.balance ?? null;
+    },
+
     formattedAvailableBalance() {
-      if (this.availableBalance === null) return 'Awaiting balance';
-      return Number.parseFloat(this.availableBalance || 0).toLocaleString('en-US', {
+      if (this.sourceAvailableBalance === null) return 'Awaiting balance';
+      return Number.parseFloat(this.sourceAvailableBalance || 0).toLocaleString('en-US', {
         style: 'currency',
         currency: 'USD',
         minimumFractionDigits: 2,
@@ -178,8 +192,8 @@ export default {
       }
       if (
         this.form.amount
-        && this.availableBalance !== null
-        && Number.parseFloat(this.form.amount) > Number.parseFloat(this.availableBalance)
+        && this.sourceAvailableBalance !== null
+        && Number.parseFloat(this.form.amount) > Number.parseFloat(this.sourceAvailableBalance)
       ) {
         return 'Amount cannot exceed the available balance';
       }
