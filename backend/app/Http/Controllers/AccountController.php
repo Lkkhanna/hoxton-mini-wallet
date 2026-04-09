@@ -35,6 +35,7 @@ class AccountController extends Controller
         try {
             $accounts = Account::withDerivedBalance()
                 ->orderByDesc('accounts.created_at')
+                ->orderByDesc('accounts.id')
                 ->get();
 
             Log::info('Accounts retrieved successfully.', [
@@ -51,18 +52,12 @@ class AccountController extends Controller
                 'message' => $e->getMessage(),
             ]);
 
-            return $this->exceptionResponse(
-                $e,
-                'Failed to retrieve accounts.'
-            );
+            return $this->exceptionResponse($e, 'Failed to retrieve accounts.');
         }
     }
 
     /**
      * Create a new wallet account.
-     *
-     * @param CreateAccountRequest $request
-     * @return JsonResponse
      */
     public function store(CreateAccountRequest $request): JsonResponse
     {
@@ -94,15 +89,13 @@ class AccountController extends Controller
     /**
      * Return the balance for a single account.
      */
-    public function balance(string $accountId): JsonResponse
+    public function balance(Account $account): JsonResponse
     {
         try {
-            $account = Account::where('account_id', $accountId)->firstOrFail();
-
-            $balance = $this->transferService->calculateBalance($accountId);
+            $balance = $this->transferService->calculateBalance($account->account_id);
 
             Log::info('Account balance retrieved successfully.', [
-                'account_id' => $accountId,
+                'account_id' => $account->account_id,
                 'balance' => $balance,
             ]);
 
@@ -115,7 +108,7 @@ class AccountController extends Controller
             );
         } catch (Throwable $e) {
             Log::error('Failed to retrieve account balance.', [
-                'account_id' => $accountId,
+                'account_id' => $account->account_id,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
             ]);
@@ -127,20 +120,18 @@ class AccountController extends Controller
     /**
      * Return paginated transaction history for a single account.
      */
-    public function transactions(Request $request, string $accountId): JsonResponse
+    public function transactions(Request $request, Account $account): JsonResponse
     {
         try {
-            Account::where('account_id', $accountId)->firstOrFail();
-
             $perPage = (int) $request->query('per_page', 10);
             $perPage = max(1, min($perPage, 50));
 
             $entries = LedgerEntry::query()
-                ->forAccountHistory($accountId)
+                ->forAccountHistory($account->account_id)
                 ->paginate($perPage);
 
             Log::info('Transaction history retrieved successfully.', [
-                'account_id' => $accountId,
+                'account_id' => $account->account_id,
                 'transaction_count' => $entries->count(),
                 'page' => $entries->currentPage(),
                 'per_page' => $entries->perPage(),
@@ -163,7 +154,7 @@ class AccountController extends Controller
             );
         } catch (Throwable $e) {
             Log::error('Failed to retrieve transaction history.', [
-                'account_id' => $accountId,
+                'account_id' => $account->account_id,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
             ]);

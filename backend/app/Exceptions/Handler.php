@@ -2,15 +2,16 @@
 
 namespace App\Exceptions;
 
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
-use Symfony\Component\HttpFoundation\Response;
 
 class Handler extends ExceptionHandler
 {
@@ -30,48 +31,6 @@ class Handler extends ExceptionHandler
      */
     public function register(): void
     {
-        // Handle insufficient funds
-        $this->renderable(function (InsufficientFundsException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'errors'  => [
-                    'amount' => [$e->getMessage()],
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        });
-
-        // Handle account creation conflicts
-        $this->renderable(function (AccountAlreadyExistsException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'errors' => [
-                    'account_id' => [$e->getMessage()],
-                ],
-                'data' => [
-                    'account_id' => $e->getAccountId(),
-                ],
-            ], Response::HTTP_CONFLICT);
-        });
-
-        // Handle duplicate transactions (idempotency)
-        $this->renderable(function (DuplicateTransactionException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'errors'  => $e->isConflictingRequest()
-                    ? [
-                        'transaction_id' => [$e->getMessage()],
-                    ]
-                    : [],
-                'data'    => [
-                    'transaction_id' => $e->getTransactionId(),
-                ],
-            ], Response::HTTP_CONFLICT);
-        });
-
-        // Handle model not found (invalid account_id etc.)
         $this->renderable(function (ModelNotFoundException $e, $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -81,7 +40,6 @@ class Handler extends ExceptionHandler
             }
         });
 
-        // Handle invalid routes for API requests
         $this->renderable(function (NotFoundHttpException $e, $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -91,7 +49,6 @@ class Handler extends ExceptionHandler
             }
         });
 
-        // Handle unsupported methods cleanly for API requests
         $this->renderable(function (MethodNotAllowedHttpException $e, $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -101,14 +58,10 @@ class Handler extends ExceptionHandler
             }
         });
 
-        // Fallback JSON response for unexpected API failures
         $this->renderable(function (Throwable $e, $request) {
             if (
                 ($request->wantsJson() || $request->is('api/*'))
                 && !($e instanceof ValidationException)
-                && !($e instanceof InsufficientFundsException)
-                && !($e instanceof AccountAlreadyExistsException)
-                && !($e instanceof DuplicateTransactionException)
                 && !($e instanceof ModelNotFoundException)
                 && !($e instanceof NotFoundHttpException)
                 && !($e instanceof MethodNotAllowedHttpException)
@@ -134,7 +87,7 @@ class Handler extends ExceptionHandler
         });
     }
 
-    protected function invalidJson($request, ValidationException $exception): \Illuminate\Http\JsonResponse
+    protected function invalidJson($request, ValidationException $exception): JsonResponse
     {
         return response()->json([
             'success' => false,

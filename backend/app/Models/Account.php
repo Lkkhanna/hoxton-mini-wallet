@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MoneyFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,10 @@ class Account extends Model
 
     protected $fillable = ['account_id', 'name'];
 
+    /**
+     * Scope: eager load ledger entry sums for balance calculation.
+     * This allows us to derive balance without N+1 queries.
+     */
     public function scopeWithDerivedBalance(Builder $query): Builder
     {
         return $query
@@ -23,6 +28,22 @@ class Account extends Model
             ->withSum([
                 'ledgerEntries as debits_sum' => fn (Builder $ledgerEntries) => $ledgerEntries->debits(),
             ], 'amount');
+    }
+
+    /**
+     * Calculate the current balance for a specific account from its ledger entries.
+     */
+    public static function calculateBalanceFor(string $accountId): string
+    {
+        $credits = LedgerEntry::where('account_id', $accountId)
+            ->credits()
+            ->sum('amount');
+
+        $debits = LedgerEntry::where('account_id', $accountId)
+            ->debits()
+            ->sum('amount');
+
+        return MoneyFormatter::signedDifference($credits, $debits);
     }
 
     /**
@@ -52,7 +73,7 @@ class Account extends Model
     public function getBalanceAttribute(): string
     {
         if (array_key_exists('balance', $this->attributes)) {
-            return $this->formatDecimalString($this->attributes['balance']);
+            return MoneyFormatter::normalizeDecimalString($this->attributes['balance']);
         }
 
         $credits = array_key_exists('credits_sum', $this->attributes)
@@ -63,51 +84,6 @@ class Account extends Model
             ? $this->attributes['debits_sum']
             : $this->ledgerEntries()->debits()->sum('amount');
 
-        return $this->formatSignedDecimalDifference($credits, $debits);
-    }
-
-    protected function formatSignedDecimalDifference(mixed $credits, mixed $debits): string
-    {
-        $normalizedCredits = $this->formatDecimalString($credits);
-        $normalizedDebits = $this->formatDecimalString($debits);
-
-        $comparison = bccomp($normalizedCredits, $normalizedDebits, 2);
-
-        if ($comparison === 0) {
-            return '0.00';
-        }
-
-        if ($comparison > 0) {
-            return bcsub($normalizedCredits, $normalizedDebits, 2);
-        }
-
-        return '-' . bcsub($normalizedDebits, $normalizedCredits, 2);
-    }
-
-    protected function formatDecimalString(mixed $value): string
-    {
-        $stringValue = trim((string) ($value ?? '0'));
-
-        if ($stringValue === '') {
-            return '0.00';
-        }
-
-        $negative = str_starts_with($stringValue, '-');
-        $unsignedValue = ltrim($stringValue, '+-');
-
-        if ($unsignedValue === '') {
-            return '0.00';
-        }
-
-        [$wholePart, $fractionPart] = array_pad(explode('.', $unsignedValue, 2), 2, '');
-
-        $wholePart = preg_replace('/\D/', '', $wholePart ?? '') ?? '';
-        $fractionPart = preg_replace('/\D/', '', $fractionPart ?? '') ?? '';
-
-        $wholePart = ltrim($wholePart, '0');
-        $wholePart = $wholePart === '' ? '0' : $wholePart;
-        $fractionPart = str_pad(substr($fractionPart, 0, 2), 2, '0');
-
-        return ($negative ? '-' : '') . $wholePart . '.' . $fractionPart;
+        return MoneyFormatter::signedDifference($credits, $debits);
     }
 }
