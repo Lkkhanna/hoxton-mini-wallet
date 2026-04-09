@@ -30,7 +30,7 @@
             <strong>{{ transaction.counterparty || 'N/A' }}</strong>
           </div>
           <div class="detail-item">
-            <span>Booked at</span>
+            <span>Transaction time</span>
             <strong>{{ formattedTimestamp }}</strong>
           </div>
         </div>

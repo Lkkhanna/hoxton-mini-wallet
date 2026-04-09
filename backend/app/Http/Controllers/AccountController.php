@@ -11,8 +11,8 @@ use App\Services\AccountService;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
@@ -135,18 +135,8 @@ class AccountController extends Controller
             $perPage = (int) $request->query('per_page', 10);
             $perPage = max(1, min($perPage, 50));
 
-            $entries = LedgerEntry::where('account_id', $accountId)
-                ->select([
-                    'id',
-                    'transaction_id',
-                    'entry_type',
-                    'amount',
-                    'counterparty_account_id',
-                    'description',
-                    'created_at',
-                ])
-                ->orderBy('created_at', 'desc')
-                ->orderBy('id', 'desc')
+            $entries = LedgerEntry::query()
+                ->forAccountHistory($accountId)
                 ->paginate($perPage);
 
             Log::info('Transaction history retrieved successfully.', [

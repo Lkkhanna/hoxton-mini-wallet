@@ -30,7 +30,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
 # 3. Build and start all services
-docker-compose up --build
+docker compose up --build
 
 # Or use the Makefile
 make build
@@ -45,7 +45,7 @@ make up
 | Backend API | http://localhost:8000/api   |
 | MySQL     | localhost:3306               |
 
-> **Note:** The first startup takes ~60 seconds as it builds containers, installs dependencies, runs migrations, and seeds the database with 3 demo accounts.
+> **Note:** The first startup takes ~60 seconds as it builds containers, installs dependencies, runs migrations, and seeds the database with 3 demo accounts plus historical ledger activity.
 
 ### Environment Configuration
 
@@ -55,6 +55,8 @@ make up
 - for Docker, the backend uses `DB_HOST=db`; if you run Laravel outside Docker, switch that host accordingly
 
 ### Default Seeded Accounts
+
+The seed data includes 12 ledger entries for `ACC001`, so transaction history pagination is visible immediately with the default `per_page=10` setting. Seeded transfers use the same `Transfer to ...` / `Transfer from ...` wording as live transfers.
 
 | Account ID | Name          | Initial Balance |
 |-----------|---------------|-----------------|

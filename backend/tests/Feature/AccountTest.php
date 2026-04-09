@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\LedgerEntry;
-use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\TestCase;
 
 class AccountTest extends TestCase
 {
@@ -50,7 +50,7 @@ class AccountTest extends TestCase
     #[Test]
     public function it_returns_conflict_when_creating_a_duplicate_account_id()
     {
-        Account::create(['account_id' => 'DUP001', 'name' => 'First']);
+        Account::factory()->withAccountId('DUP001')->create(['name' => 'First']);
 
         $response = $this->postJson('/api/accounts', [
             'account_id' => 'dup001',
@@ -77,11 +77,11 @@ class AccountTest extends TestCase
     #[Test]
     public function it_returns_balance_as_zero_for_new_account()
     {
-        Account::create(['account_id' => 'ZERO001', 'name' => 'Zero Balance']);
+        Account::factory()->withAccountId('ZERO001')->create(['name' => 'Zero Balance']);
 
         $response = $this->getJson('/api/accounts/ZERO001/balance');
 
-        $response->assertStatus(200)
+        $response->assertStatus(Response::HTTP_OK)
             ->assertJsonPath('data.account_id', 'ZERO001')
             ->assertJsonPath('data.balance', '0.00');
     }
@@ -89,28 +89,26 @@ class AccountTest extends TestCase
     #[Test]
     public function it_returns_correct_balance_from_ledger()
     {
-        Account::create(['account_id' => 'BAL001', 'name' => 'Balance Test']);
-        Account::create(['account_id' => 'BAL002', 'name' => 'Counterparty']);
+        Account::factory()->withAccountId('BAL001')->create(['name' => 'Balance Test']);
+        Account::factory()->withAccountId('BAL002')->create(['name' => 'Counterparty']);
 
-        LedgerEntry::create([
+        LedgerEntry::factory()->credit()->create([
             'transaction_id' => 'TXN-BAL-1',
             'account_id' => 'BAL001',
-            'entry_type' => 'credit',
             'amount' => 1000.00,
             'counterparty_account_id' => 'BAL002',
         ]);
 
-        LedgerEntry::create([
+        LedgerEntry::factory()->debit()->create([
             'transaction_id' => 'TXN-BAL-2',
             'account_id' => 'BAL001',
-            'entry_type' => 'debit',
             'amount' => 250.00,
             'counterparty_account_id' => 'BAL002',
         ]);
 
         $response = $this->getJson('/api/accounts/BAL001/balance');
 
-        $response->assertStatus(200)
+        $response->assertStatus(Response::HTTP_OK)
             ->assertJsonPath('data.balance', '750.00');
     }
 
@@ -118,19 +116,19 @@ class AccountTest extends TestCase
     public function it_returns_404_for_nonexistent_account_balance()
     {
         $response = $this->getJson('/api/accounts/GHOST999/balance');
-        $response->assertStatus(404);
+
+        $response->assertStatus(Response::HTTP_NOT_FOUND);
     }
 
     #[Test]
     public function it_returns_transaction_history()
     {
-        Account::create(['account_id' => 'HIST001', 'name' => 'History Test']);
-        Account::create(['account_id' => 'HIST002', 'name' => 'Counterparty']);
+        Account::factory()->withAccountId('HIST001')->create(['name' => 'History Test']);
+        Account::factory()->withAccountId('HIST002')->create(['name' => 'Counterparty']);
 
-        LedgerEntry::create([
+        LedgerEntry::factory()->credit()->create([
             'transaction_id' => 'TXN-H1',
             'account_id' => 'HIST001',
-            'entry_type' => 'credit',
             'amount' => 500.00,
             'counterparty_account_id' => 'HIST002',
             'description' => 'Test credit',
@@ -138,7 +136,7 @@ class AccountTest extends TestCase
 
         $response = $this->getJson('/api/accounts/HIST001/transactions');
 
-        $response->assertStatus(200)
+        $response->assertStatus(Response::HTTP_OK)
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'credit')
             ->assertJsonPath('data.0.amount', '500.00')
@@ -149,25 +147,26 @@ class AccountTest extends TestCase
     #[Test]
     public function it_paginates_transaction_history()
     {
-        Account::create(['account_id' => 'PAGE001', 'name' => 'Paged History']);
-        Account::create(['account_id' => 'PAGE002', 'name' => 'Counterparty']);
+        Account::factory()->withAccountId('PAGE001')->create(['name' => 'Paged History']);
+        Account::factory()->withAccountId('PAGE002')->create(['name' => 'Counterparty']);
 
         foreach (range(1, 12) as $index) {
-            LedgerEntry::create([
-                'transaction_id' => 'TXN-PAGE-' . $index,
-                'account_id' => 'PAGE001',
-                'entry_type' => $index % 2 === 0 ? 'debit' : 'credit',
-                'amount' => 10 + $index,
-                'counterparty_account_id' => 'PAGE002',
-                'description' => 'Paged entry ' . $index,
-                'created_at' => now()->subMinutes($index),
-                'updated_at' => now()->subMinutes($index),
-            ]);
+            LedgerEntry::factory()
+                ->state([
+                    'transaction_id' => 'TXN-PAGE-' . $index,
+                    'account_id' => 'PAGE001',
+                    'entry_type' => $index % 2 === 0 ? 'debit' : 'credit',
+                    'amount' => 10 + $index,
+                    'counterparty_account_id' => 'PAGE002',
+                    'description' => 'Paged entry ' . $index,
+                    'created_at' => now()->subMinutes($index),
+                ])
+                ->create();
         }
 
         $response = $this->getJson('/api/accounts/PAGE001/transactions?page=2&per_page=5');
 
-        $response->assertStatus(200)
+        $response->assertStatus(Response::HTTP_OK)
             ->assertJsonCount(5, 'data')
             ->assertJsonPath('meta.pagination.current_page', 2)
             ->assertJsonPath('meta.pagination.last_page', 3)
@@ -178,12 +177,12 @@ class AccountTest extends TestCase
     #[Test]
     public function it_lists_all_accounts()
     {
-        Account::create(['account_id' => 'LIST001', 'name' => 'First']);
-        Account::create(['account_id' => 'LIST002', 'name' => 'Second']);
+        Account::factory()->withAccountId('LIST001')->create(['name' => 'First']);
+        Account::factory()->withAccountId('LIST002')->create(['name' => 'Second']);
 
         $response = $this->getJson('/api/accounts');
 
-        $response->assertStatus(200)
+        $response->assertStatus(Response::HTTP_OK)
             ->assertJsonFragment(['account_id' => 'LIST001'])
             ->assertJsonFragment(['account_id' => 'LIST002']);
     }
@@ -193,6 +192,6 @@ class AccountTest extends TestCase
     {
         $response = $this->getJson('/api/accounts/GHOST999/transactions');
 
-        $response->assertStatus(404);
+        $response->assertStatus(Response::HTTP_NOT_FOUND);
     }
 }

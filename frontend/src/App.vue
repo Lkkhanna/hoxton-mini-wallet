@@ -16,7 +16,7 @@ export default {
 <style>
 :root {
   --color-ink: #0d2238;
-  --color-ink-soft: #44556b;
+  --color-ink-soft: #7d8691;
   --color-muted: #718096;
   --color-surface: rgba(255, 252, 246, 0.92);
   --color-surface-strong: #fffdf8;
@@ -132,6 +132,68 @@ a {
   font-size: 0.96rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.header-nav-action {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 4px;
+  padding: 12px 16px;
+  border: 1px solid rgba(6, 47, 57, 0.1);
+  border-radius: 16px;
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-weight: 800;
+  text-align: center;
+}
+
+.desktop-header-action {
+  display: inline-flex;
+}
+
+.mobile-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 18px;
+  border: 1.5px solid rgba(6, 47, 57, 0.18);
+  background: rgba(255, 255, 255, 0.44);
+  color: #062f39;
+}
+
+.mobile-nav-toggle-icon,
+.mobile-nav-toggle-icon::before,
+.mobile-nav-toggle-icon::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: var(--transition);
+}
+
+.mobile-nav-toggle-icon {
+  position: relative;
+}
+
+.mobile-nav-toggle-icon::before,
+.mobile-nav-toggle-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.mobile-nav-toggle-icon::before {
+  top: -6px;
+}
+
+.mobile-nav-toggle-icon::after {
+  top: 6px;
 }
 
 .header-meta {
@@ -365,7 +427,15 @@ a {
   .header-shell,
   .app-footer-inner {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .header-shell {
+    gap: 14px;
+  }
+
+  .brand-lockup {
+    width: auto;
   }
 
   .brand-logo {
@@ -373,8 +443,40 @@ a {
     height: 34px;
   }
 
+  .mobile-nav-toggle {
+    display: inline-flex;
+    align-self: flex-end;
+  }
+
+  .header-nav {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 14px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(6, 47, 57, 0.08);
+    box-shadow: var(--color-shadow-soft);
+  }
+
+  .header-nav a {
+    width: 100%;
+    padding: 10px 8px;
+    font-size: 1rem;
+  }
+
+  .header-nav.header-nav-open {
+    display: flex;
+  }
+
+  .header-nav-action {
+    display: inline-flex;
+  }
+
   .header-meta {
-    justify-content: flex-start;
+    display: none;
   }
 
   .card {

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Account extends Model
 {
@@ -14,28 +15,14 @@ class Account extends Model
 
     public function scopeWithDerivedBalance(Builder $query): Builder
     {
-        return $query->leftJoin('ledger_entries', 'ledger_entries.account_id', '=', 'accounts.account_id')
-            ->select(
-                'accounts.id',
-                'accounts.account_id',
-                'accounts.name',
-                'accounts.created_at',
-                'accounts.updated_at'
-            )
-            ->selectRaw(" 
-                COALESCE(SUM(CASE
-                    WHEN ledger_entries.entry_type = 'credit' THEN ledger_entries.amount
-                    WHEN ledger_entries.entry_type = 'debit' THEN -ledger_entries.amount
-                    ELSE 0
-                END), 0) as balance
-            ")
-            ->groupBy(
-                'accounts.id',
-                'accounts.account_id',
-                'accounts.name',
-                'accounts.created_at',
-                'accounts.updated_at'
-            );
+        return $query
+            ->select('accounts.*')
+            ->withSum([
+                'ledgerEntries as credits_sum' => fn (Builder $ledgerEntries) => $ledgerEntries->credits(),
+            ], 'amount')
+            ->withSum([
+                'ledgerEntries as debits_sum' => fn (Builder $ledgerEntries) => $ledgerEntries->debits(),
+            ], 'amount');
     }
 
     /**
@@ -50,7 +37,7 @@ class Account extends Model
     /**
      * Get all ledger entries for this account.
      */
-    public function ledgerEntries()
+    public function ledgerEntries(): HasMany
     {
         return $this->hasMany(LedgerEntry::class, 'account_id', 'account_id');
     }
@@ -68,20 +55,36 @@ class Account extends Model
             return $this->formatDecimalString($this->attributes['balance']);
         }
 
-        $balance = $this->ledgerEntries()
-            ->selectRaw(" 
-                COALESCE(SUM(CASE 
-                    WHEN entry_type = 'credit' THEN amount 
-                    WHEN entry_type = 'debit' THEN -amount 
-                    ELSE 0 
-                END), 0) as balance
-            ")
-            ->value('balance');
+        $credits = array_key_exists('credits_sum', $this->attributes)
+            ? $this->attributes['credits_sum']
+            : $this->ledgerEntries()->credits()->sum('amount');
 
-        return $this->formatDecimalString($balance);
+        $debits = array_key_exists('debits_sum', $this->attributes)
+            ? $this->attributes['debits_sum']
+            : $this->ledgerEntries()->debits()->sum('amount');
+
+        return $this->formatSignedDecimalDifference($credits, $debits);
     }
 
-    protected function formatDecimalString($value): string
+    protected function formatSignedDecimalDifference(mixed $credits, mixed $debits): string
+    {
+        $normalizedCredits = $this->formatDecimalString($credits);
+        $normalizedDebits = $this->formatDecimalString($debits);
+
+        $comparison = bccomp($normalizedCredits, $normalizedDebits, 2);
+
+        if ($comparison === 0) {
+            return '0.00';
+        }
+
+        if ($comparison > 0) {
+            return bcsub($normalizedCredits, $normalizedDebits, 2);
+        }
+
+        return '-' . bcsub($normalizedDebits, $normalizedCredits, 2);
+    }
+
+    protected function formatDecimalString(mixed $value): string
     {
         $stringValue = trim((string) ($value ?? '0'));
 

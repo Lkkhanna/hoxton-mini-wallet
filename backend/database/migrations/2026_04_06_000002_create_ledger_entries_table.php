@@ -18,26 +18,19 @@ return new class extends Migration
             $table->string('description', 255)->nullable();
             $table->timestamp('created_at')->useCurrent();
 
-            // ── Indexes ──────────────────────────────────────────────
-            // Compound unique index enforces idempotency:
-            // Each transaction_id creates exactly 2 entries (1 debit + 1 credit)
             $table->unique(['transaction_id', 'account_id'], 'ledger_idempotency_unique');
+            $table->index(['account_id', 'entry_type'], 'ledger_account_type_index');
+            $table->index(['account_id', 'created_at'], 'ledger_account_created_at_index');
 
-            // Fast lookups for balance calculation and transaction history
-            $table->index('account_id');
-            $table->index('transaction_id');
-            $table->index(['account_id', 'created_at']);
-
-            // ── Foreign Keys ─────────────────────────────────────────
             $table->foreign('account_id')
-                  ->references('account_id')
-                  ->on('accounts')
-                  ->onDelete('restrict'); // Never delete an account with ledger entries
+                ->references('account_id')
+                ->on('accounts')
+                ->onDelete('restrict');
 
             $table->foreign('counterparty_account_id')
-                  ->references('account_id')
-                  ->on('accounts')
-                  ->onDelete('restrict');
+                ->references('account_id')
+                ->on('accounts')
+                ->onDelete('restrict');
         });
     }
 

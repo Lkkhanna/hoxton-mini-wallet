@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class LedgerEntry extends Model
 {
@@ -21,7 +22,7 @@ class LedgerEntry extends Model
     ];
 
     protected $casts = [
-        'amount'     => 'decimal:2',
+        'amount' => 'decimal:2',
         'created_at' => 'datetime',
     ];
 
@@ -44,7 +45,7 @@ class LedgerEntry extends Model
     /**
      * Scope: filter by credit entries.
      */
-    public function scopeCredits($query)
+    public function scopeCredits(Builder $query): Builder
     {
         return $query->where('entry_type', 'credit');
     }
@@ -52,8 +53,27 @@ class LedgerEntry extends Model
     /**
      * Scope: filter by debit entries.
      */
-    public function scopeDebits($query)
+    public function scopeDebits(Builder $query): Builder
     {
         return $query->where('entry_type', 'debit');
+    }
+
+    /**
+     * Scope: build the standard account history query used by the transactions endpoint.
+     */
+    public function scopeForAccountHistory(Builder $query, string $accountId): Builder
+    {
+        return $query->where('account_id', $accountId)
+            ->select([
+                'id',
+                'transaction_id',
+                'entry_type',
+                'amount',
+                'counterparty_account_id',
+                'description',
+                'created_at',
+            ])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 }

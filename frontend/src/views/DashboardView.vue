@@ -15,16 +15,39 @@
           >
         </a>
 
-        <nav class="header-nav" aria-label="Primary">
-          <a href="#account-selector">Accounts</a>
-          <a href="#transfer-form">Transfers</a>
-          <a href="#balance-display">Balance</a>
-          <a href="#transaction-list">History</a>
+        <button
+          class="mobile-nav-toggle"
+          type="button"
+          :aria-expanded="mobileNavOpen ? 'true' : 'false'"
+          aria-controls="primary-navigation"
+          aria-label="Toggle navigation"
+          @click="toggleMobileNav"
+        >
+          <span class="mobile-nav-toggle-icon" aria-hidden="true"></span>
+        </button>
+
+        <nav
+          id="primary-navigation"
+          class="header-nav"
+          :class="{ 'header-nav-open': mobileNavOpen }"
+          aria-label="Primary"
+        >
+          <a href="#account-selector" @click="closeMobileNav">Accounts</a>
+          <a href="#transfer-form" @click="closeMobileNav">Transfers</a>
+          <a href="#balance-display" @click="closeMobileNav">Balance</a>
+          <a href="#transaction-list" @click="closeMobileNav">History</a>
+          <button
+            class="header-nav-action"
+            type="button"
+            @click="openCreateAccountFromMenu"
+          >
+            New Account
+          </button>
         </nav>
 
         <div class="header-meta">
           <button
-            class="btn btn-secondary btn-sm"
+            class="btn btn-secondary btn-sm desktop-header-action"
             @click="showCreateModal = true"
           >
             New Account
@@ -194,6 +217,7 @@ export default {
       },
       selectedTransaction: null,
       showTransactionModal: false,
+      mobileNavOpen: false,
     };
   },
 
@@ -331,6 +355,19 @@ export default {
       this.fetchTransactions();
     },
 
+    toggleMobileNav() {
+      this.mobileNavOpen = !this.mobileNavOpen;
+    },
+
+    closeMobileNav() {
+      this.mobileNavOpen = false;
+    },
+
+    openCreateAccountFromMenu() {
+      this.closeMobileNav();
+      this.showCreateModal = true;
+    },
+
     openTransactionDetails(transaction) {
       this.selectedTransaction = transaction;
       this.showTransactionModal = true;
@@ -356,6 +393,7 @@ export default {
     },
 
     onAccountSelected(accountId) {
+      this.closeMobileNav();
       this.selectedAccountId = accountId;
     },
 
@@ -365,6 +403,7 @@ export default {
       this.creatingAccount = true;
       try {
         const response = await api.createAccount({ account_id: accountId, name });
+        this.closeMobileNav();
         this.showCreateModal = false;
         this.showNotification(response.message, 'success');
         await this.fetchAccounts();

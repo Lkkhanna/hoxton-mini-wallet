@@ -65,13 +65,14 @@
           <span>$</span>
           <input
             id="transfer-amount"
-            type="number"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
             class="form-input amount-input"
-            v-model="form.amount"
-            min="0.01"
-            step="0.01"
+            :value="form.amount"
             placeholder="0.00"
             required
+            @input="onAmountInput"
           />
         </div>
       </div>
@@ -140,7 +141,7 @@ export default {
       if (!this.form.fromAccountId) return 'Select a source account';
       if (!this.form.toAccountId) return `Funding will leave ${this.form.fromAccountId}`;
       if (!this.form.amount) return `Route ready: ${this.form.fromAccountId} to ${this.form.toAccountId}`;
-      return `Move $${Number.parseFloat(this.form.amount || 0).toFixed(2)} to ${this.form.toAccountId}`;
+      return `Move $${this.formatAmountPreview(this.form.amount)} to ${this.form.toAccountId}`;
     },
 
     summaryLabel() {
@@ -163,7 +164,7 @@ export default {
       if (this.form.fromAccountId && this.form.fromAccountId === this.form.toAccountId) {
         return 'Cannot transfer to the same account';
       }
-      if (this.form.amount && parseFloat(this.form.amount) <= 0) {
+      if (this.form.amount && Number.parseFloat(this.form.amount) <= 0) {
         return 'Amount must be greater than zero';
       }
       return null;
@@ -174,7 +175,7 @@ export default {
         this.form.fromAccountId &&
         this.form.toAccountId &&
         this.form.amount &&
-        parseFloat(this.form.amount) > 0 &&
+        Number.parseFloat(this.form.amount) > 0 &&
         this.form.fromAccountId !== this.form.toAccountId &&
         !this.validationError
       );
@@ -204,6 +205,30 @@ export default {
   },
 
   methods: {
+    onAmountInput(event) {
+      const rawValue = event.target.value || '';
+      const sanitized = rawValue
+        .replace(/[^\d.]/g, '')
+        .replace(/(\..*)\./g, '$1');
+
+      const [wholePart = '', fractionPart = ''] = sanitized.split('.', 2);
+      const normalizedWhole = wholePart.replace(/^0+(?=\d)/, '') || (wholePart ? '0' : '');
+      const normalizedFraction = fractionPart.slice(0, 2);
+
+      this.form.amount = sanitized.includes('.')
+        ? `${normalizedWhole}.${normalizedFraction}`
+        : normalizedWhole;
+    },
+
+    formatAmountPreview(amount) {
+      const parsed = Number.parseFloat(amount);
+      if (Number.isNaN(parsed)) {
+        return '0.00';
+      }
+
+      return parsed.toFixed(2);
+    },
+
     handleSubmit() {
       if (!this.isValid || this.loading) return;
 

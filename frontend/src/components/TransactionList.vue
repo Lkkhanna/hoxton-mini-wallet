@@ -6,7 +6,7 @@
     </div>
 
     <div v-if="!accountId" class="empty-state">
-      <div class="empty-icon">01</div>
+      <div class="empty-icon">0</div>
       <p>Select an account to unlock the activity feed.</p>
     </div>
 

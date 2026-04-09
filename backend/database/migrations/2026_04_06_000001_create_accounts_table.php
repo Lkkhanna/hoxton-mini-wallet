@@ -13,8 +13,6 @@ return new class extends Migration
             $table->string('account_id', 10)->unique();
             $table->string('name', 100)->nullable();
             $table->timestamps();
-
-            $table->index('account_id');
         });
     }
 
