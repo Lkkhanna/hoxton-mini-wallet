@@ -101,6 +101,9 @@
 </template>
 
 <script>
+const MAX_TRANSFER_AMOUNT = 10000000;
+const MIN_ACCOUNT_ID_LENGTH = 3;
+
 export default {
   name: 'TransferForm',
   props: {
@@ -161,11 +164,27 @@ export default {
     },
 
     validationError() {
+      if (this.form.fromAccountId && this.form.fromAccountId.length < MIN_ACCOUNT_ID_LENGTH) {
+        return 'Source account ID must be at least 3 characters';
+      }
+      if (this.form.toAccountId && this.form.toAccountId.length < MIN_ACCOUNT_ID_LENGTH) {
+        return 'Destination account ID must be at least 3 characters';
+      }
       if (this.form.fromAccountId && this.form.fromAccountId === this.form.toAccountId) {
         return 'Cannot transfer to the same account';
       }
       if (this.form.amount && Number.parseFloat(this.form.amount) <= 0) {
         return 'Amount must be greater than zero';
+      }
+      if (
+        this.form.amount
+        && this.availableBalance !== null
+        && Number.parseFloat(this.form.amount) > Number.parseFloat(this.availableBalance)
+      ) {
+        return 'Amount cannot exceed the available balance';
+      }
+      if (this.form.amount && Number.parseFloat(this.form.amount) > MAX_TRANSFER_AMOUNT) {
+        return 'Amount cannot exceed $10,000,000.00';
       }
       return null;
     },
@@ -176,6 +195,7 @@ export default {
         this.form.toAccountId &&
         this.form.amount &&
         Number.parseFloat(this.form.amount) > 0 &&
+        Number.parseFloat(this.form.amount) <= MAX_TRANSFER_AMOUNT &&
         this.form.fromAccountId !== this.form.toAccountId &&
         !this.validationError
       );

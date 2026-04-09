@@ -58,7 +58,7 @@ make up
 
 The seed data includes 12 ledger entries for `ACC001`, so transaction history pagination is visible immediately with the default `per_page=10` setting. Seeded transfers use the same `Transfer to ...` / `Transfer from ...` wording as live transfers.
 
-| Account ID | Name          | Initial Balance |
+| Account ID | Name          | Current Seeded Balance |
 |-----------|---------------|-----------------|
 | ACC001    | Alice Johnson | $10,000.00      |
 | ACC002    | Bob Smith     | $5,000.00       |
@@ -204,16 +204,7 @@ This keeps the product small, but avoids turning the root component into an unst
 
 ### Ledger-Based Balance (No Mutable Balance Field)
 
-The most critical design decision: **balance is NEVER stored as a mutable column**. Instead, it's derived on-the-fly from the sum of ledger entries:
-
-```sql
-SELECT COALESCE(SUM(CASE 
-    WHEN entry_type = 'credit' THEN amount 
-    WHEN entry_type = 'debit' THEN -amount 
-END), 0) as balance
-FROM ledger_entries 
-WHERE account_id = ?
-```
+The most critical design decision: **balance is NEVER stored as a mutable column**. Instead, it is derived from ledger entries by summing credits and debits when needed.
 
 **Why?** This guarantees consistency. A mutable balance column can drift from reality due to bugs, race conditions, or partial updates. The ledger is the single source of truth.
 
@@ -261,7 +252,7 @@ The frontend generates UUID v4 for each transfer attempt. For account creation, 
 | Column     | Type         | Notes           |
 |-----------|--------------|-----------------|
 | id        | BIGINT PK    | Auto-increment  |
-| account_id| VARCHAR(50)  | UNIQUE, indexed |
+| account_id| VARCHAR(10)  | UNIQUE          |
 | name      | VARCHAR(100) | Nullable        |
 | timestamps|              |                 |
 
@@ -270,14 +261,18 @@ The frontend generates UUID v4 for each transfer attempt. For account creation, 
 |------------------------|---------------|--------------------------------|
 | id                     | BIGINT PK     | Auto-increment                 |
 | transaction_id         | VARCHAR(100)  | Idempotency key                |
-| account_id             | VARCHAR(50)   | FK → accounts                 |
+| account_id             | VARCHAR(10)   | FK → accounts                  |
 | entry_type             | ENUM          | 'credit' or 'debit'          |
 | amount                 | DECIMAL(15,2) | Always positive, unsigned      |
-| counterparty_account_id| VARCHAR(50)   | FK → accounts                 |
+| counterparty_account_id| VARCHAR(10)   | FK → accounts                  |
 | description            | VARCHAR(255)  | Nullable                       |
 | created_at             | TIMESTAMP     |                                |
 
-**Key Index:** `UNIQUE (transaction_id, account_id)` — enforces idempotency
+**Key indexes and constraints:**
+- `UNIQUE (transaction_id, account_id)` — supports idempotency safety at the database level
+- `INDEX (account_id, entry_type)` — supports balance aggregation queries
+- `INDEX (account_id, created_at)` — supports account transaction history queries
+- foreign keys on `account_id` and `counterparty_account_id` preserve ledger/account integrity
 
 ---
 
@@ -288,12 +283,12 @@ The frontend generates UUID v4 for each transfer attempt. For account creation, 
 make test
 
 # Or directly
-docker-compose exec backend php artisan test
+docker compose exec backend php artisan test tests/Feature
 ```
 
 ### Test Coverage
 - **AccountTest:** Create, duplicate rejection, balance derivation, transaction history, 404 handling
-- **TransferTest:** Normal transfer, idempotency, insufficient funds, negative amounts, zero amounts, self-transfer, nonexistent accounts, exact balance transfer, sequential transfers
+- **TransferTest:** Normal transfer, idempotency, conflicting duplicate transaction IDs, insufficient funds, negative amounts, zero amounts, oversized amounts, self-transfer, nonexistent accounts, exact balance transfer, sequential transfers
 
 ---
 
@@ -317,11 +312,11 @@ make clean           # Stop + remove volumes
 
 | Area | Simple (Chose This) | Production Alternative |
 |------|---------------------|----------------------|
-| Balance | Computed from SUM() | Cached column + reconciliation |
+| Balance | Derived from ledger reads | Cached column + reconciliation |
 | Auth | None | JWT / OAuth2 |
-| Pagination | Limit 100 | Cursor-based pagination |
+| Pagination | Offset pagination, max `per_page` 50 | Cursor-based pagination |
 | State management | Vue.observable | Vuex / Pinia |
-| Error handling | HTTP error codes | Structured error envelopes |
+| Error handling | Structured JSON API envelopes | Richer error taxonomy / tracing IDs |
 | Transfer processing | Synchronous | Queue-based async |
 | Monitoring | Logs | APM + metrics + alerting |
 
@@ -351,7 +346,8 @@ make clean           # Stop + remove volumes
 └── frontend/
     ├── Dockerfile
     ├── src/
-    │   ├── App.vue             # Main layout + state
+    │   ├── App.vue             # Global shell and styles
+    │   ├── views/DashboardView.vue
     │   ├── services/api.js     # Axios API layer
     │   └── components/
     │       ├── AccountSelector.vue
@@ -367,10 +363,7 @@ make clean           # Stop + remove volumes
 
 ## 🔮 Scaling Considerations
 
-1. **Balance caching** — Add `balance` column, update atomically within transfer transaction, reconcile hourly
-2. **Connection pooling** — Use persistent connections or a connection pooler
-3. **Sharding** — Partition by account_id for horizontal scaling (cross-shard = distributed tx)
-4. **CQRS** — Separate read/write models; ledger entries are already an event log
-5. **Async processing** — Queue-based transfers for high throughput
-6. **Rate limiting** — Protect transfer endpoint from abuse
-7. **Multi-currency** — Add currency column + exchange rate service
+1. **Balance caching** — Add a cached balance projection with periodic reconciliation while keeping the ledger as source of truth
+2. **Async processing** — Move high-volume transfer side effects and reconciliation tasks onto queues
+3. **Rate limiting and auth** — Add authentication, authorization, and abuse protection if this becomes a real product
+4. **Read scaling** — Tune indexes further and consider separate read models for very large transaction-history workloads

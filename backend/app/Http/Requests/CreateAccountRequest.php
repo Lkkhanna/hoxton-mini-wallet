@@ -28,6 +28,7 @@ class CreateAccountRequest extends FormRequest
                 'bail',
                 'required',
                 'string',
+                'min:3',
                 'max:10',
                 'regex:/^[A-Z0-9_-]+$/',
             ],
@@ -61,6 +62,7 @@ class CreateAccountRequest extends FormRequest
         return [
             'account_id.required' => 'Account ID is required.',
             'account_id.regex' => 'Account ID may only contain uppercase letters, numbers, hyphens, and underscores.',
+            'account_id.min' => 'Account ID must be at least 3 characters.',
             'account_id.max' => 'Account ID must not exceed 10 characters.',
             'name.max' => 'Name must not exceed 100 characters.',
         ];

@@ -19,10 +19,11 @@
               class="form-input"
               v-model="form.accountId"
               placeholder="e.g. ACC004"
+              minlength="3"
               maxlength="10"
-              pattern="[A-Za-z0-9_-]+"
               required
               ref="accountIdInput"
+              @input="clearAccountIdValidity"
             />
             <small class="form-hint">Letters, numbers, hyphens, and underscores only</small>
           </div>
@@ -99,13 +100,37 @@ export default {
   },
 
   methods: {
+    clearAccountIdValidity() {
+      this.$refs.accountIdInput?.setCustomValidity('');
+    },
+
     // Keep the emitted payload canonical and trimmed so the view and API are
     // working with the same account identifier format.
     handleSubmit() {
-      if (!this.form.accountId.trim() || this.loading) return;
+      const normalizedAccountId = this.form.accountId.trim().toUpperCase();
+
+      if (!normalizedAccountId || this.loading) return;
+
+      if (normalizedAccountId.length < 3) {
+        this.$refs.accountIdInput?.setCustomValidity(
+          'Account ID must be at least 3 characters.'
+        );
+        this.$refs.accountIdInput?.reportValidity();
+        return;
+      }
+
+      if (!/^[A-Z0-9_-]+$/.test(normalizedAccountId)) {
+        this.$refs.accountIdInput?.setCustomValidity(
+          'Use letters, numbers, hyphens, or underscores only.'
+        );
+        this.$refs.accountIdInput?.reportValidity();
+        return;
+      }
+
+      this.$refs.accountIdInput?.setCustomValidity('');
 
       this.$emit('create', {
-        accountId: this.form.accountId.trim().toUpperCase(),
+        accountId: normalizedAccountId,
         name: this.form.name.trim() || null,
       });
     },

@@ -168,6 +168,20 @@ class TransferTest extends TestCase
     }
 
     #[Test]
+    public function it_rejects_amounts_above_ten_million()
+    {
+        $response = $this->postJson('/api/transfers', [
+            'transaction_id' => 'TXN-TOO-LARGE',
+            'from_account_id' => 'SENDER',
+            'to_account_id' => 'RECEIVER',
+            'amount' => 10000000.01,
+        ]);
+
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors('amount');
+    }
+
+    #[Test]
     public function it_rejects_self_transfer()
     {
         $response = $this->postJson('/api/transfers', [
@@ -206,6 +220,28 @@ class TransferTest extends TestCase
 
         $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors('transaction_id');
+    }
+
+    #[Test]
+    public function it_normalizes_transfer_account_ids_before_validation()
+    {
+        $response = $this->postJson('/api/transfers', [
+            'transaction_id' => ' TXN-NORMALIZE ',
+            'from_account_id' => ' sender ',
+            'to_account_id' => ' receiver ',
+            'amount' => 100.00,
+        ]);
+
+        $response->assertStatus(Response::HTTP_CREATED)
+            ->assertJsonPath('data.transaction_id', 'TXN-NORMALIZE')
+            ->assertJsonPath('data.from_account_id', 'SENDER')
+            ->assertJsonPath('data.to_account_id', 'RECEIVER');
+
+        $this->getJson('/api/accounts/SENDER/balance')
+            ->assertJsonPath('data.balance', '900.00');
+
+        $this->getJson('/api/accounts/RECEIVER/balance')
+            ->assertJsonPath('data.balance', '100.00');
     }
 
     #[Test]
