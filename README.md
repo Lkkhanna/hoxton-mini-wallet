@@ -22,7 +22,7 @@ A minimal full-stack financial system that simulates account management, money t
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/hoxton-mini-wallet.git
+git clone https://github.com/Lkkhanna/hoxton-mini-wallet.git
 cd hoxton-mini-wallet
 
 # 2. Create local environment files
