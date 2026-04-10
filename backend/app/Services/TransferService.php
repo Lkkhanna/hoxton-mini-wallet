@@ -6,7 +6,7 @@ use App\Exceptions\DuplicateTransactionException;
 use App\Exceptions\InsufficientFundsException;
 use App\Models\Account;
 use App\Models\LedgerEntry;
-use App\Support\MoneyFormatter;
+use App\Helpers\MoneyFormatter;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;

@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\MoneyFormatter;
+use App\Helpers\MoneyFormatter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
