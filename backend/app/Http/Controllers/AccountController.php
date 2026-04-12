@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * Handles account-oriented API endpoints such as listing, creation, balance,
@@ -89,26 +90,33 @@ class AccountController extends Controller
     /**
      * Return the balance for a single account.
      */
-    public function balance(Account $account): JsonResponse
+    public function balance(string $account_id): JsonResponse
     {
         try {
-            $balance = $this->transferService->calculateBalance($account->account_id);
+            Account::checkAccountID($account_id);
+            $balance = $this->transferService->calculateBalance($account_id);
 
             Log::info('Account balance retrieved successfully.', [
-                'account_id' => $account->account_id,
+                'account_id' => $account_id,
                 'balance' => $balance,
             ]);
 
             return $this->successResponse(
                 [
-                    'account_id' => $account->account_id,
+                    'account_id' => $account_id,
                     'balance' => $balance,
                 ],
                 'Account balance retrieved successfully.'
             );
+        } catch (ModelNotFoundException $e) {
+            Log::error('Account not found.', [
+                'account_id' => $account_id,
+            ]);
+
+            return $this->errorResponse("The account id: '{$account_id}' is incorrect", Response::HTTP_NOT_FOUND);
         } catch (Throwable $e) {
             Log::error('Failed to retrieve account balance.', [
-                'account_id' => $account->account_id,
+                'account_id' => $account_id,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
             ]);

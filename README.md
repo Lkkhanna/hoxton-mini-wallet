@@ -227,15 +227,16 @@ DB::transaction(function () {
 - **Deadlock Prevention:** Accounts are always locked in alphabetical order
 - **Race Conditions:** `SELECT ... FOR UPDATE` prevents concurrent balance reads during transfer
 
-### Idempotency (Double-Checked)
+### Financial Precision (`bcmath`)
 
-```
-1. Quick check BEFORE acquiring locks (optimization)
-2. Check AGAIN INSIDE the transaction (correctness)
-3. UNIQUE index on (transaction_id, account_id) (last resort)
-```
+Because floating-point arithmetic introduces severe bugs in financial applications (e.g. `0.1 + 0.2 = 0.30000000000000004`), balances and transfers are strictly kept as string values in PHP using the `bcmath` extension (`bccomp`). This prevents sub-cent rounding drifts.
 
-Three layers ensure a duplicate `transaction_id` never creates duplicate transfers, even under concurrent requests. If the same request is retried with the same `transaction_id`, the API returns the original transfer result. If the same `transaction_id` is reused with a different payload, the API returns `409 Conflict`.
+### Idempotency (Triple-Checked & Schema Locked)
+
+Three strict layers ensure a duplicate `transaction_id` never results in duplicate transfers:
+1. **Application Pre-check**: Fast query before acquiring database locks.
+2. **Schema Constraint Lock**: A strict database-level constraint `UNIQUE(transaction_id, entry_type)`. Since every transfer has exactly one debit and one credit, this global constraint absolutely prevents two concurrent requests from stealing the same `transaction_id` (even if they try to touch entirely different account pairs).
+3. **Graceful Replay**: The service intercepts unique constraint violations (`23000`) and seamlessly replays the original transaction payload (returning 200 OK or 409 Conflict depending on if the payload changed).
 
 ### Client-Generated Transaction IDs
 
@@ -269,7 +270,7 @@ The frontend generates UUID v4 for each transfer attempt. For account creation, 
 | created_at             | TIMESTAMP     |                                |
 
 **Key indexes and constraints:**
-- `UNIQUE (transaction_id, account_id)` — supports idempotency safety at the database level
+- `UNIQUE (transaction_id, entry_type)` — supports idempotency safety at the database level
 - `INDEX (account_id, entry_type)` — supports balance aggregation queries
 - `INDEX (account_id, created_at)` — supports account transaction history queries
 - foreign keys on `account_id` and `counterparty_account_id` preserve ledger/account integrity

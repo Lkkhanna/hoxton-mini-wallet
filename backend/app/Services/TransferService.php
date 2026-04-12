@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 /**
  * Coordinates the atomic ledger workflow for transfers.
@@ -42,47 +43,18 @@ class TransferService
     ): array {
         $normalizedAmount = $this->normalizeAmount($amount);
 
-        Log::info('Processing transfer request.', [
-            'transaction_id' => $transactionId,
-            'from_account_id' => $fromAccountId,
-            'to_account_id' => $toAccountId,
-            'amount' => $normalizedAmount,
-        ]);
+        try {
 
-        $existingTransfer = $this->findTransferByTransactionId($transactionId);
-        if ($existingTransfer !== null) {
-            Log::info('Duplicate transaction detected before lock acquisition.', [
+            Log::info('Processing transfer request.', [
                 'transaction_id' => $transactionId,
+                'from_account_id' => $fromAccountId,
+                'to_account_id' => $toAccountId,
+                'amount' => $normalizedAmount,
             ]);
-
-            return $this->resolveExistingTransfer(
-                $existingTransfer,
-                $transactionId,
-                $fromAccountId,
-                $toAccountId,
-                $normalizedAmount
-            );
-        }
-
-        return DB::transaction(function () use ($transactionId, $fromAccountId, $toAccountId, $normalizedAmount) {
-            $sortedIds = collect([$fromAccountId, $toAccountId])->sort()->values();
-
-            $accounts = Account::whereIn('account_id', $sortedIds->all())
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('account_id');
-
-            if (!$accounts->has($fromAccountId)) {
-                throw (new ModelNotFoundException())->setModel(Account::class, [$fromAccountId]);
-            }
-
-            if (!$accounts->has($toAccountId)) {
-                throw (new ModelNotFoundException())->setModel(Account::class, [$toAccountId]);
-            }
 
             $existingTransfer = $this->findTransferByTransactionId($transactionId);
             if ($existingTransfer !== null) {
-                Log::info('Duplicate transaction detected after lock acquisition.', [
+                Log::info('Duplicate transaction detected before lock acquisition.', [
                     'transaction_id' => $transactionId,
                 ]);
 
@@ -95,55 +67,122 @@ class TransferService
                 );
             }
 
-            $senderBalance = $this->calculateBalance($fromAccountId);
+            return DB::transaction(function () use ($transactionId, $fromAccountId, $toAccountId, $normalizedAmount) {
+                $sortedIds = collect([$fromAccountId, $toAccountId])->sort()->values();
 
-            if (bccomp($senderBalance, $normalizedAmount, MoneyFormatter::SCALE) < 0) {
-                throw new InsufficientFundsException(
-                    $fromAccountId,
-                    $senderBalance,
-                    $normalizedAmount
-                );
+                $accounts = Account::whereIn('account_id', $sortedIds->all())
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('account_id');
+
+                if (!$accounts->has($fromAccountId)) {
+                    throw (new ModelNotFoundException())->setModel(Account::class, [$fromAccountId]);
+                }
+
+                if (!$accounts->has($toAccountId)) {
+                    throw (new ModelNotFoundException())->setModel(Account::class, [$toAccountId]);
+                }
+
+                $existingTransfer = $this->findTransferByTransactionId($transactionId);
+                if ($existingTransfer !== null) {
+                    Log::info('Duplicate transaction detected after lock acquisition.', [
+                        'transaction_id' => $transactionId,
+                    ]);
+
+                    return $this->resolveExistingTransfer(
+                        $existingTransfer,
+                        $transactionId,
+                        $fromAccountId,
+                        $toAccountId,
+                        $normalizedAmount
+                    );
+                }
+
+                $senderBalance = $this->calculateBalance($fromAccountId);
+
+                if (bccomp($senderBalance, $normalizedAmount, MoneyFormatter::SCALE) < 0) {
+                    throw new InsufficientFundsException(
+                        $fromAccountId,
+                        $senderBalance,
+                        $normalizedAmount
+                    );
+                }
+
+                $now = now();
+
+                LedgerEntry::create([
+                    'transaction_id' => $transactionId,
+                    'account_id' => $fromAccountId,
+                    'entry_type' => 'debit',
+                    'amount' => $normalizedAmount,
+                    'counterparty_account_id' => $toAccountId,
+                    'description' => "Transfer to {$toAccountId}",
+                    'created_at' => $now,
+                ]);
+
+                LedgerEntry::create([
+                    'transaction_id' => $transactionId,
+                    'account_id' => $toAccountId,
+                    'entry_type' => 'credit',
+                    'amount' => $normalizedAmount,
+                    'counterparty_account_id' => $fromAccountId,
+                    'description' => "Transfer from {$fromAccountId}",
+                    'created_at' => $now,
+                ]);
+
+                Log::info('Transfer completed successfully.', [
+                    'transaction_id' => $transactionId,
+                    'from_account_id' => $fromAccountId,
+                    'to_account_id' => $toAccountId,
+                    'amount' => $normalizedAmount,
+                ]);
+
+                return [
+                    'transaction_id' => $transactionId,
+                    'from_account_id' => $fromAccountId,
+                    'to_account_id' => $toAccountId,
+                    'amount' => $normalizedAmount,
+                    'status' => 'completed',
+                    'idempotency_status' => 'created',
+                    'created_at' => $now->toIso8601String(),
+                ];
+            });
+        } catch (Throwable $e) {
+            // PDO returns '23000' (string) for all integrity constraint violations.
+            // We narrow to our specific idempotency index to avoid masking other
+            // constraint failures (foreign keys, NOT NULL, etc.)
+            if (
+                $e->getCode() === '23000' &&
+                str_contains($e->getMessage(), 'ledger_idempotency_unique')
+            ) {
+                Log::warning('Duplicate transaction detected at DB constraint level.', [
+                    'transaction_id' => $transactionId,
+                ]);
+
+                $existing = $this->findTransferByTransactionId($transactionId);
+
+                if ($existing) {
+                    return $this->resolveExistingTransfer(
+                        $existing,
+                        $transactionId,
+                        $fromAccountId,
+                        $toAccountId,
+                        $normalizedAmount
+                    );
+                }
+
+                // Constraint fired but no committed rows found — two concurrent
+                // requests with disjoint account pairs and same transaction_id.
+                throw new DuplicateTransactionException($transactionId, true);
             }
 
-            $now = now();
-
-            LedgerEntry::create([
+            Log::error('Transfer failed unexpectedly.', [
                 'transaction_id' => $transactionId,
-                'account_id' => $fromAccountId,
-                'entry_type' => 'debit',
-                'amount' => $normalizedAmount,
-                'counterparty_account_id' => $toAccountId,
-                'description' => "Transfer to {$toAccountId}",
-                'created_at' => $now,
+                'error' => $e->getMessage(),
             ]);
 
-            LedgerEntry::create([
-                'transaction_id' => $transactionId,
-                'account_id' => $toAccountId,
-                'entry_type' => 'credit',
-                'amount' => $normalizedAmount,
-                'counterparty_account_id' => $fromAccountId,
-                'description' => "Transfer from {$fromAccountId}",
-                'created_at' => $now,
-            ]);
-
-            Log::info('Transfer completed successfully.', [
-                'transaction_id' => $transactionId,
-                'from_account_id' => $fromAccountId,
-                'to_account_id' => $toAccountId,
-                'amount' => $normalizedAmount,
-            ]);
-
-            return [
-                'transaction_id' => $transactionId,
-                'from_account_id' => $fromAccountId,
-                'to_account_id' => $toAccountId,
-                'amount' => $normalizedAmount,
-                'status' => 'completed',
-                'idempotency_status' => 'created',
-                'created_at' => $now->toIso8601String(),
-            ];
-        });
+            throw $e;
+        }
     }
 
     /**

@@ -28,6 +28,10 @@ class AccountService
     public function createAccount(array $attributes): Account
     {
         try {
+            $account = Account::where('account_id', $attributes['account_id'])->first();
+            if ($account) {
+                throw new AccountAlreadyExistsException($attributes['account_id']);
+            }
             $account = Account::create($attributes);
 
             Log::info('Account persisted successfully.', [

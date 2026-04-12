@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('description', 255)->nullable();
             $table->timestamp('created_at')->useCurrent();
 
-            $table->unique(['transaction_id', 'account_id'], 'ledger_idempotency_unique');
+            $table->unique(['transaction_id', 'entry_type'], 'ledger_idempotency_unique');
             $table->index(['account_id', 'entry_type'], 'ledger_account_type_index');
             $table->index(['account_id', 'created_at'], 'ledger_account_created_at_index');
 

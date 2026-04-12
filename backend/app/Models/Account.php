@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class Account extends Model
 {
@@ -64,26 +65,16 @@ class Account extends Model
     }
 
     /**
-     * Derive balance from ledger entries.
-     * Balance = SUM(credits) - SUM(debits)
-     *
-     * This is the ONLY source of truth for balance.
-     * We never store balance as a mutable field.
+     * Check if an account with the given ID exists and return it.
+     * Throws ModelNotFoundException if not found.
      */
-    public function getBalanceAttribute(): string
+    public static function checkAccountID(string $account_id): Account
     {
-        if (array_key_exists('balance', $this->attributes)) {
-            return MoneyFormatter::normalizeDecimalString($this->attributes['balance']);
+        $account = Account::where('account_id', $account_id)->first();
+        if (!$account) {
+            throw new ModelNotFoundException("Account with id '{$account_id}' not found.");
         }
 
-        $credits = array_key_exists('credits_sum', $this->attributes)
-            ? $this->attributes['credits_sum']
-            : $this->ledgerEntries()->credits()->sum('amount');
-
-        $debits = array_key_exists('debits_sum', $this->attributes)
-            ? $this->attributes['debits_sum']
-            : $this->ledgerEntries()->debits()->sum('amount');
-
-        return MoneyFormatter::signedDifference($credits, $debits);
+        return $account;
     }
 }

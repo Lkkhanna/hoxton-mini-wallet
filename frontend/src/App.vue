@@ -50,12 +50,18 @@ export default {
   box-sizing: border-box;
 }
 
+html {
+  background-color: #f2ece2;
+}
+
 body {
   font-family: var(--font-family-sans);
   background:
     radial-gradient(circle at top left, rgba(200, 169, 107, 0.22), transparent 32%),
     radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 28%),
     linear-gradient(180deg, #f6f0e7 0%, #fbf8f2 42%, #f2ece2 100%);
+  background-attachment: fixed;
+  background-color: #f2ece2;
   color: var(--color-ink);
   line-height: 1.6;
   min-height: 100vh;

@@ -116,6 +116,7 @@ class AccountTest extends TestCase
     public function it_returns_404_for_nonexistent_account_balance()
     {
         $response = $this->getJson('/api/accounts/GHOST999/balance');
+        // dd($response);
 
         $response->assertStatus(Response::HTTP_NOT_FOUND);
     }
