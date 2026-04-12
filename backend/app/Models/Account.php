@@ -65,6 +65,30 @@ class Account extends Model
     }
 
     /**
+     * Derive balance from ledger entries.
+     * Balance = SUM(credits) - SUM(debits)
+     *
+     * This is the ONLY source of truth for balance.
+     * We never store balance as a mutable field.
+     */
+    public function getBalanceAttribute(): string
+    {
+        if (array_key_exists('balance', $this->attributes)) {
+            return MoneyFormatter::normalizeDecimalString($this->attributes['balance']);
+        }
+
+        $credits = array_key_exists('credits_sum', $this->attributes)
+            ? $this->attributes['credits_sum']
+            : $this->ledgerEntries()->credits()->sum('amount');
+
+        $debits = array_key_exists('debits_sum', $this->attributes)
+            ? $this->attributes['debits_sum']
+            : $this->ledgerEntries()->debits()->sum('amount');
+
+        return MoneyFormatter::signedDifference($credits, $debits);
+    }
+
+    /**
      * Check if an account with the given ID exists and return it.
      * Throws ModelNotFoundException if not found.
      */
