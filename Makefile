@@ -41,7 +41,7 @@ fresh: ## Fresh migrate + seed (drops all tables)
 	docker compose exec backend php artisan migrate:fresh --seed --force
 
 test: ## Run backend tests
-	docker compose exec backend php artisan test tests/feature
+	docker compose exec backend php artisan test tests/Feature
 
 tinker: ## Open Laravel tinker
 	docker compose exec backend php artisan tinker

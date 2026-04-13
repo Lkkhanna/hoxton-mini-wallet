@@ -28,17 +28,7 @@ class AccountService
     public function createAccount(array $attributes): Account
     {
         try {
-            $account = Account::where('account_id', $attributes['account_id'])->first();
-            if ($account) {
-                throw new AccountAlreadyExistsException($attributes['account_id']);
-            }
-            $account = Account::create($attributes);
-
-            Log::info('Account persisted successfully.', [
-                'account_id' => $account->account_id,
-            ]);
-
-            return $account;
+            return Account::create($attributes);
         } catch (QueryException $e) {
             if ($this->isUniqueConstraintViolation($e)) {
                 throw new AccountAlreadyExistsException($attributes['account_id']);
@@ -49,7 +39,10 @@ class AccountService
     }
 
     /**
-     * Detect duplicate-key failures across the common local/dev database drivers.
+     * Detect duplicate-key failures
+     * 
+     * @param QueryException $exception
+      * @return bool
      */
     protected function isUniqueConstraintViolation(QueryException $exception): bool
     {

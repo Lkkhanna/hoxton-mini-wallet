@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  */
 class AccountController extends Controller
 {
+    public const MAX_PER_PAGE = 50;
+    
     public function __construct(
         protected TransferService $transferService,
         protected AccountService $accountService
@@ -35,7 +37,6 @@ class AccountController extends Controller
     {
         try {
             $accounts = Account::withDerivedBalance()
-                ->orderByDesc('accounts.created_at')
                 ->orderByDesc('accounts.id')
                 ->get();
 
@@ -89,6 +90,9 @@ class AccountController extends Controller
 
     /**
      * Return the balance for a single account.
+     * 
+     * @param string $account_id
+     * @return JsonResponse
      */
     public function balance(string $account_id): JsonResponse
     {
@@ -127,12 +131,16 @@ class AccountController extends Controller
 
     /**
      * Return paginated transaction history for a single account.
+     * 
+     * @param Request $request
+     * @param Account $account
+     * @return JsonResponse
      */
     public function transactions(Request $request, Account $account): JsonResponse
     {
         try {
             $perPage = (int) $request->query('per_page', 10);
-            $perPage = max(1, min($perPage, 50));
+            $perPage = max(1, min($perPage, self::MAX_PER_PAGE));
 
             $entries = LedgerEntry::query()
                 ->forAccountHistory($account->account_id)

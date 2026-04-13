@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
+use Carbon\Carbon;
 
 /**
  * Coordinates the atomic ledger workflow for transfers.
@@ -29,6 +30,10 @@ class TransferService
      * 3. CONSISTENCY  - Balance is derived from the ledger under row-level lock.
      * 4. DEADLOCK-FREE - Accounts are locked in deterministic order.
      *
+     * @param string $transactionId Unique ID for the transfer transaction
+     * @param string $fromAccountId Sender's account ID
+     * @param string $toAccountId Recipient's account ID
+     * @param string $amount Transfer amount as a string (validated by TransferRequest)
      * @return array<string, mixed>
      *
      * @throws DuplicateTransactionException
@@ -52,6 +57,7 @@ class TransferService
                 'amount' => $normalizedAmount,
             ]);
 
+            // Check for existing transfer
             $existingTransfer = $this->findTransferByTransactionId($transactionId);
             if ($existingTransfer !== null) {
                 Log::info('Duplicate transaction detected before lock acquisition.', [
@@ -67,6 +73,7 @@ class TransferService
                 );
             }
 
+            // Perform the transfer within a transaction to ensure atomicity and consistency
             return DB::transaction(function () use ($transactionId, $fromAccountId, $toAccountId, $normalizedAmount) {
                 $sortedIds = collect([$fromAccountId, $toAccountId])->sort()->values();
 
@@ -83,6 +90,7 @@ class TransferService
                     throw (new ModelNotFoundException())->setModel(Account::class, [$toAccountId]);
                 }
 
+                // Re-check for existing transfer after acquiring locks to ensure idempotency under concurrency
                 $existingTransfer = $this->findTransferByTransactionId($transactionId);
                 if ($existingTransfer !== null) {
                     Log::info('Duplicate transaction detected after lock acquisition.', [
@@ -100,6 +108,7 @@ class TransferService
 
                 $senderBalance = $this->calculateBalance($fromAccountId);
 
+                // Check for sufficient funds before attempting to write any ledger entries
                 if (bccomp($senderBalance, $normalizedAmount, MoneyFormatter::SCALE) < 0) {
                     throw new InsufficientFundsException(
                         $fromAccountId,
@@ -110,25 +119,17 @@ class TransferService
 
                 $now = now();
 
-                LedgerEntry::create([
-                    'transaction_id' => $transactionId,
-                    'account_id' => $fromAccountId,
-                    'entry_type' => 'debit',
-                    'amount' => $normalizedAmount,
-                    'counterparty_account_id' => $toAccountId,
-                    'description' => "Transfer to {$toAccountId}",
-                    'created_at' => $now,
-                ]);
+                // Create ledger entry for debit
+                $this->createLedgerEntry(
+                    $transactionId, $fromAccountId, 'debit',
+                    $normalizedAmount, $toAccountId, $now
+                );
 
-                LedgerEntry::create([
-                    'transaction_id' => $transactionId,
-                    'account_id' => $toAccountId,
-                    'entry_type' => 'credit',
-                    'amount' => $normalizedAmount,
-                    'counterparty_account_id' => $fromAccountId,
-                    'description' => "Transfer from {$fromAccountId}",
-                    'created_at' => $now,
-                ]);
+                // Create ledger entry for credit
+                $this->createLedgerEntry(
+                    $transactionId, $toAccountId, 'credit',
+                    $normalizedAmount, $fromAccountId, $now
+                );
 
                 Log::info('Transfer completed successfully.', [
                     'transaction_id' => $transactionId,
@@ -186,7 +187,42 @@ class TransferService
     }
 
     /**
+     * Create a ledger entry for one side of the transfer.
+     * 
+     * @param string $transactionId Unique ID for the transfer transaction
+     * @param string $accountId Account affected by this ledger entry
+     * @param string $entryType 'debit' or 'credit'
+     * @param string $amount
+     * @param Carbon $now Timestamp for created_at
+     */
+    private function createLedgerEntry(
+        string $transactionId,
+        string $accountId,
+        string $entryType,
+        string $amount,
+        string $counterpartyAccountId,
+        Carbon $now
+    ): void {
+        $isDebit = $entryType === 'debit';
+
+        LedgerEntry::create([
+            'transaction_id'          => $transactionId,
+            'account_id'              => $accountId,
+            'entry_type'              => $entryType,
+            'amount'                  => $amount,
+            'counterparty_account_id' => $counterpartyAccountId,
+            'description'             => $isDebit
+                ? "Transfer to {$counterpartyAccountId}"
+                : "Transfer from {$counterpartyAccountId}",
+            'created_at'              => $now,
+        ]);
+    }
+
+    /**
      * Calculate the current balance for an account from ledger entries only.
+     * 
+     * @param string $accountId
+     * @return string Normalized two-decimal string representing the balance
      */
     public function calculateBalance(string $accountId): string
     {
@@ -195,6 +231,9 @@ class TransferService
 
     /**
      * Normalize a validated amount into a two-decimal string for storage/response.
+     * 
+     * @param string $amount
+     * @return string Normalized amount as a string with 2 decimal places
      */
     protected function normalizeAmount(string $amount): string
     {
@@ -206,6 +245,7 @@ class TransferService
      *
      * Returns null when the transfer does not exist yet.
      *
+     * @param string $transactionId
      * @return array<string, mixed>|null
      */
     protected function findTransferByTransactionId(string $transactionId): ?array
@@ -263,7 +303,11 @@ class TransferService
     /**
      * Validate that an existing idempotent transfer matches the incoming payload.
      *
-     * @param  array<string, mixed>  $existingTransfer
+     * @param array<string, mixed> $existingTransfer
+     * @param string $transactionId
+     * @param string $fromAccountId
+     * @param string $toAccountId
+     * @param string $amount Normalized two-decimal string
      * @return array<string, mixed>
      *
      * @throws DuplicateTransactionException
