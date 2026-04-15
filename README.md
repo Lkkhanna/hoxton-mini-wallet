@@ -464,10 +464,10 @@ This submission demonstrates correct financial engineering patterns within the e
 | Authentication        | None                        | JWT / OAuth2, per-user account scoping          |
 | Idempotency table     | DB constraint + error catch | Dedicated `transfer_idempotency` table          |
 | Balance caching       | Derived from SUM on reads   | Materialised balance + reconciliation job       |
-| Distributed tracing   | Structured logs             | Correlation IDs + APM                          |
+| Distributed tracing   | Structured logs             | Correlation IDs + APM                           |
 | DB statement timeouts | None                        | Per-query timeout to prevent hung transfers     |
 | Rate limiting         | None                        | Per-user and per-IP limits                      |
-| Secrets management    | `.env` files                | Vault / AWS Secrets Manager                     |
+| Multi Currency Support| None                        | Add proper Multi Currency Support               |
 | Integer amounts       | DECIMAL(15,2)               | Integer pence for zero decimal risk             |
 | Cursor pagination     | Offset-based                | Cursor-based for large ledgers                  |
 | Transfer queue        | Synchronous                 | Queue-based async at high volume                |
